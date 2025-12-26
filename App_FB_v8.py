@@ -913,8 +913,6 @@ with tabs[1]:
         data["aportes_tarifas"],
         data["aportes_pagos"],
     )
-
-    )
     inv_df = data[\"inversionista\"]; inv_movs_df = data[\"inversionista_movs\"]
     st.success(f"Cliente listo (ID interno: {cid[:8]}).")
 
