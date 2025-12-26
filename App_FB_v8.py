@@ -724,6 +724,34 @@ st.sidebar.markdown(f"### {APP_NAME}")
 st.sidebar.caption("Persistencia en Google Sheets")
 st.sidebar.divider()
 
+
+with st.sidebar.expander("🔍 Diagnóstico Google Sheets", expanded=True):
+    try:
+        # 1) Credenciales y cliente
+        creds = _gs_credentials()
+        st.write("✅ Credenciales OK")
+        gc = _gs_client()
+        st.write("✅ Cliente gspread OK")
+
+        # 2) Abre el Sheet y lista pestañas
+        sh = _get_spreadsheet()
+        st.write("✅ Abre Sheet ID:", SHEET_ID)
+        ws_list = [ws.title for ws in sh.worksheets()]
+        st.write("📄 Pestañas:", ws_list)
+
+        # 3) Tamaños de cada pestaña clave
+        for name in ["clientes", "prestamos", "pagos", "parametros",
+                     "integrantes", "aportes_tarifas", "aportes_pagos",
+                     "inversionista", "inversionista_movs"]:
+            try:
+                df_test = read_df(name)
+                st.write(f"🧪 {name}: {df_test.shape[0]} filas x {df_test.shape[1]} cols")
+            except Exception as e:
+                st.write(f"⚠️ {name}: error leyendo → {e}")
+
+    except Exception as e:
+        st.error(f"❌ Falla de conexión: {e}")
+
 if st.sidebar.button("💾 Guardar todo en Google Sheets", key="side_save"):
     save_data(clientes, prestamos, pagos, parametros)
     save_aportes_data(integrantes, aportes_tarifas, aportes_pagos)
