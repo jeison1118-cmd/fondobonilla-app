@@ -28,6 +28,83 @@ ACCENT_COLOR = "#FFD166"
 BG_GRADIENT = "linear-gradient(135deg, #0E7A57 0%, #1B998B 50%, #066F4C 100%)"
 
 
+
+# --- Google Sheets auth + helpers (Service Account via st.secrets or local file) ---
+import requests
+from google.oauth2.service_account import Credentials
+from google.auth.transport.requests import Request
+import gspread
+from gspread_dataframe import get_as_dataframe, set_with_dataframe
+
+# ID de tu Google Sheet (proporcionado por el usuario)
+SHEET_ID = "1aPxmaALRzYA3VsRD8LQuDbt1kdDeToTW"
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
+
+def _gs_credentials():
+    import streamlit as st
+    import os
+    if "gcp_service_account" in st.secrets:
+        sa_info = st.secrets["gcp_service_account"]
+        return Credentials.from_service_account_info(sa_info, scopes=SCOPES)
+    # Fallback local: service_account.json junto al script
+    json_path = Path(__file__).with_name("service_account.json")
+    if not json_path.exists():
+        st.error("Faltan credenciales. Sube el JSON a Secrets (Cloud) o coloca service_account.json (local).")
+        st.stop()
+    return Credentials.from_service_account_file(str(json_path), scopes=SCOPES)
+
+@st.cache_resource
+def _gs_client():
+    creds = _gs_credentials()
+    return gspread.authorize(creds)
+
+@st.cache_resource
+def _get_spreadsheet():
+    gc = _gs_client()
+    return gc.open_by_key(SHEET_ID)
+
+def _get_ws(worksheet_name: str):
+    sh = _get_spreadsheet()
+    # Crea la pestaña si no existe
+    try:
+        return sh.worksheet(worksheet_name)
+    except Exception:
+        return sh.add_worksheet(title=worksheet_name, rows=1000, cols=20)
+
+def read_df(sheet_name: str):
+    ws = _get_ws(sheet_name)
+    df = get_as_dataframe(
+        ws,
+        evaluate_formulas=True,
+        header=0,
+        na_value="",
+        drop_empty_rows=True,
+        drop_empty_columns=True,
+    )
+    import pandas as pd
+    return df if df is not None else pd.DataFrame()
+
+def write_df(sheet_name: str, df):
+    ws = _get_ws(sheet_name)
+    ws.clear()
+    set_with_dataframe(ws, df, include_index=False, include_column_header=True, resize=True)
+
+def export_sheet_to_xlsx(local_path: str = "/tmp/fondo.xlsx"):
+    # Exporta el Google Sheet completo a .xlsx para backup/descarga
+    creds = _gs_credentials()
+    creds = creds.with_scopes(["https://www.googleapis.com/auth/drive.readonly"])  # narrow scope
+    creds.refresh(Request())
+    headers = {"Authorization": f"Bearer {creds.token}"}
+    url = f"https://www.googleapis.com/drive/v3/files/{SHEET_ID}/export"
+    params = {"mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+    r = requests.get(url, headers=headers, params=params, timeout=60)
+    r.raise_for_status()
+    Path(local_path).write_bytes(r.content)
+    return local_path
+
 def inject_css():
     st.markdown(
         f"""
@@ -176,40 +253,53 @@ def init_empty_frames():
     return clientes, prestamos, pagos, parametros, integrantes, aportes_tarifas, aportes_pagos
 
 
-def ensure_base_file():
-    if not os.path.exists(EXCEL_PATH):
-        (clientes, prestamos, pagos, parametros, integrantes, aportes_tarifas, aportes_pagos) = init_empty_frames()
-        parametros = pd.DataFrame([{"clave": "capital_inicial", "valor": 0}])
-        with pd.ExcelWriter(EXCEL_PATH, engine="openpyxl") as writer:
-            clientes.to_excel(writer, sheet_name="clientes", index=False)
-            prestamos.to_excel(writer, sheet_name="prestamos", index=False)
-            pagos.to_excel(writer, sheet_name="pagos", index=False)
-            parametros.to_excel(writer, sheet_name="parametros", index=False)
-            integrantes.to_excel(writer, sheet_name="integrantes", index=False)
-            aportes_tarifas.to_excel(writer, sheet_name="aportes_tarifas", index=False)
-            aportes_pagos.to_excel(writer, sheet_name="aportes_pagos", index=False)
-            # Inversionista base (Teresa Pérez)
-            inv = pd.DataFrame(
-                [
-                    {
-                        "nombre": "Teresa Pérez",
-                        "capital_inicial": 1000000,
-                        "ganancia_anual": 70000,
-                        "ganancia_pendiente": 70000,
-                        "estado": "activo",
-                        "creado_en": datetime.now(),
-                        "actualizado_en": datetime.now(),
-                    }
-                ]
-            )
-            inv.to_excel(writer, sheet_name="inversionista", index=False)
-            inv_movs = pd.DataFrame(columns=["mov_id", "fecha", "tipo", "monto", "observaciones", "creado_en"])
-            inv_movs.to_excel(writer, sheet_name="inversionista_movs", index=False)
 
-
-def safe_read(path, sheet):
+def ensure_base_sheets():
+    # Crea pestañas si no existen y inicializa con estructuras vacías cuando estén vacías
+    (clientes, prestamos, pagos, parametros, integrantes, aportes_tarifas, aportes_pagos) = init_empty_frames()
     try:
-        return pd.read_excel(path, sheet_name=sheet, engine="openpyxl")
+        # Inicializar parámetros mínimos si la pestaña está vacía
+        df_param = read_df("parametros")
+        if df_param.empty:
+            df_param = pd.DataFrame([{"clave": "capital_inicial", "valor": 0}])
+            write_df("parametros", df_param)
+        # Asegurar pestañas de núcleo
+        for name, df in {
+            "clientes": clientes,
+            "prestamos": prestamos,
+            "pagos": pagos,
+            "integrantes": integrantes,
+            "aportes_tarifas": aportes_tarifas,
+            "aportes_pagos": aportes_pagos,
+        }.items():
+            cur = read_df(name)
+            if cur.empty and df is not None:
+                write_df(name, df)
+        # Inversionista base
+        inv_df = read_df("inversionista")
+        if inv_df.empty:
+            inv_df = pd.DataFrame([
+                {
+                    "nombre": "Teresa Pérez",
+                    "capital_inicial": 1000000,
+                    "ganancia_anual": 70000,
+                    "ganancia_pendiente": 70000,
+                    "estado": "activo",
+                    "creado_en": datetime.now(),
+                    "actualizado_en": datetime.now(),
+                }
+            ])
+            write_df("inversionista", inv_df)
+        inv_movs_df = read_df("inversionista_movs")
+        if inv_movs_df.empty:
+            inv_movs_df = pd.DataFrame(columns=["mov_id", "fecha", "tipo", "monto", "observaciones", "creado_en"])
+            write_df("inversionista_movs", inv_movs_df)
+    except Exception as e:
+        import streamlit as st
+        st.warning(f"No se pudo asegurar pestañas base: {e}")
+def safe_read(sheet):
+    try:
+        return read_df(sheet)
     except:
         return pd.DataFrame()
 
@@ -221,16 +311,15 @@ def ensure_cols(df, cols):
     return df
 
 
-def load_data(path=EXCEL_PATH):
-    if not os.path.exists(path):
-        return init_empty_frames()
-    clientes = safe_read(path, "clientes")
-    prestamos = safe_read(path, "prestamos")
-    pagos = safe_read(path, "pagos")
-    parametros = safe_read(path, "parametros")
-    integrantes = safe_read(path, "integrantes")
-    aportes_tarifas = safe_read(path, "aportes_tarifas")
-    aportes_pagos = safe_read(path, "aportes_pagos")
+def load_data():
+    ensure_base_sheets()
+    clientes = safe_read("clientes")
+    prestamos = safe_read("prestamos")
+    pagos = safe_read("pagos")
+    parametros = safe_read("parametros")
+    integrantes = safe_read("integrantes")
+    aportes_tarifas = safe_read("aportes_tarifas")
+    aportes_pagos = safe_read("aportes_pagos")
 
     clientes = ensure_cols(clientes, ["cliente_id", "nombre", "identificacion", "telefono", "email", "creado_en", "actualizado_en"])
     prestamos = ensure_cols(
@@ -319,9 +408,9 @@ def load_data(path=EXCEL_PATH):
 
 
 # --- Inversionista (helpers) ---
-def _safe_read_sheet(path, sheet):
+def _safe_read_sheet(sheet):
     try:
-        return pd.read_excel(path, sheet_name=sheet, engine="openpyxl")
+        return read_df(sheet)
     except Exception:
         return pd.DataFrame()
 
@@ -342,10 +431,10 @@ def ensure_inv_mov_cols(mov_df: pd.DataFrame) -> pd.DataFrame:
     return mov_df
 
 
-def load_inversionista(path=EXCEL_PATH):
-    inv = _safe_read_sheet(path, "inversionista")
+def load_inversionista():
+    inv = _safe_read_sheet("inversionista")
     inv = ensure_inv_cols(inv)
-    movs = _safe_read_sheet(path, "inversionista_movs")
+    movs = _safe_read_sheet("inversionista_movs")
     movs = ensure_inv_mov_cols(movs)
     # Si no hay fila, inicializar Teresa por defecto
     if inv.empty:
@@ -365,11 +454,9 @@ def load_inversionista(path=EXCEL_PATH):
     return inv, movs
 
 
-def save_inversionista_data(inv_df, movs_df, path=EXCEL_PATH):
-    mode = "a" if os.path.exists(path) else "w"
-    with pd.ExcelWriter(path, engine="openpyxl", mode=mode, if_sheet_exists="replace") as writer:
-        inv_df.to_excel(writer, sheet_name="inversionista", index=False)
-        movs_df.to_excel(writer, sheet_name="inversionista_movs", index=False)
+def save_inversionista_data(inv_df, movs_df):
+    write_df("inversionista", inv_df)
+    write_df("inversionista_movs", movs_df)
 
 
 def save_data(clientes, prestamos, pagos, parametros, path=EXCEL_PATH):
@@ -382,22 +469,22 @@ def save_data(clientes, prestamos, pagos, parametros, path=EXCEL_PATH):
         parametros.to_excel(writer, sheet_name="parametros", index=False)
 
 
-def save_aportes_data(integrantes, aportes_tarifas, aportes_pagos, path=EXCEL_PATH):
-    mode = "a" if os.path.exists(path) else "w"
-    with pd.ExcelWriter(path, engine="openpyxl", mode=mode, if_sheet_exists="replace") as writer:
-        integrantes.to_excel(writer, sheet_name="integrantes", index=False)
-        aportes_tarifas.to_excel(writer, sheet_name="aportes_tarifas", index=False)
-        aportes_pagos.to_excel(writer, sheet_name="aportes_pagos", index=False)
+def save_aportes_data(integrantes, aportes_tarifas, aportes_pagos):
+    write_df("integrantes", integrantes)
+    write_df("aportes_tarifas", aportes_tarifas)
+    write_df("aportes_pagos", aportes_pagos)
 
 
 def create_backup():
+    import os
     os.makedirs(BACKUP_DIR, exist_ok=True)
-    if os.path.exists(EXCEL_PATH):
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        dst = os.path.join(BACKUP_DIR, f"fondo_{ts}.xlsx")
-        shutil.copy2(EXCEL_PATH, dst)
-        return dst
-    return None
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    dst = os.path.join(BACKUP_DIR, f"fondo_{ts}.xlsx")
+    try:
+        path = export_sheet_to_xlsx(dst)
+        return path
+    except Exception as e:
+        return None
 
 
 # ----------------- Lógica -----------------
@@ -629,15 +716,15 @@ Contabilidad en Excel · Cuota fija · Mora por días · Adelanto extra · Re‑
     unsafe_allow_html=True,
 )
 
-ensure_base_file()
+ensure_base_sheets()
 (clientes, prestamos, pagos, parametros, integrantes, aportes_tarifas, aportes_pagos) = load_data()
 
 # Sidebar
 st.sidebar.markdown(f"### {APP_NAME}")
-st.sidebar.caption("Persistencia en 'fondo.xlsx'")
+st.sidebar.caption("Persistencia en Google Sheets")
 st.sidebar.divider()
 
-if st.sidebar.button("💾 Guardar todo en Excel", key="side_save"):
+if st.sidebar.button("💾 Guardar todo en Google Sheets", key="side_save"):
     save_data(clientes, prestamos, pagos, parametros)
     save_aportes_data(integrantes, aportes_tarifas, aportes_pagos)
     inv_df, inv_movs_df = load_inversionista()
@@ -646,7 +733,7 @@ if st.sidebar.button("💾 Guardar todo en Excel", key="side_save"):
 
 if st.sidebar.button("🛟 Crear backup", key="side_backup"):
     dst = create_backup()
-    st.sidebar.success(f"Backup: {dst}") if dst else st.sidebar.warning("No existe 'fondo.xlsx'.")
+    st.sidebar.success(f"Backup: {dst}") if dst else st.sidebar.warning("No se pudo crear el backup.")
 
 uploaded_calc = st.sidebar.file_uploader("📥 Importar calculadora (Hoja 1)", type=["xlsx"], key="side_upload_calc")
 if uploaded_calc is not None and st.sidebar.button("➡️ Importar primera hoja", key="side_import_btn"):
@@ -1148,9 +1235,9 @@ with tabs[6]:
         tasa_text = st.text_input("Nueva tasa mensual (%)", value=percent_str(pr["tasa_mensual"]) if not pd.isna(pr["tasa_mensual"]) else "0%", key="rea_tasa")
         i_m = parse_percent(tasa_text)
         saldo_actual = safe_int(pr.get("saldo_capital"), default=0)
-        modo = st.radio("Elige modalidad", options=["Reducir cuota (mantener plazo)", "Reducir plazo (mantener cuota)"], index=0, key="rea_modo")
+        modo = st.radio("Elige modalidad", options=["Reducir cuota (aumentar plazo)", "Reducir plazo (aumentar cuota)"], index=0, key="rea_modo")
 
-        if modo == "Reducir cuota (mantener plazo)":
+        if modo == "Reducir cuota (aumentar plazo)":
             nueva_cuota_deseada = st.text_input("Cuota deseada (COP)", value=str(safe_int(pr.get("cuota_fija"), default=1)), key="rea_cuota_deseada")
             try:
                 cuota_in = safe_int(nueva_cuota_deseada, default=safe_int(pr.get("cuota_fija"), default=1))
