@@ -37,7 +37,7 @@ import gspread
 from gspread_dataframe import get_as_dataframe, set_with_dataframe
 
 # ID de tu Google Sheet (proporcionado por el usuario)
-SHEET_ID = "1aPxmaALRzYA3VsRD8LQuDbt1kdDeToTW"
+SHEET_ID = "1RbVD9oboyVfSPiwHS5B4xD9h9i6cxyXLY9uXhdQx62s"
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
