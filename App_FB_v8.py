@@ -905,7 +905,15 @@ with tabs[1]:
             save_data(clientes, prestamos, pagos, parametros)
     data = get_data()
     (clientes, prestamos, pagos, parametros, integrantes, aportes_tarifas, aportes_pagos) = (
-        data[\"clientes\"], data[\"prestamos\"], data[\"pagos\"], data[\"parametros\"], data[\"integrantes\"], data[\"aportes_tarifas\"], data[\"aportes_pagos\"]
+        data["clientes"],
+        data["prestamos"],
+        data["pagos"],
+        data["parametros"],
+        data["integrantes"],
+        data["aportes_tarifas"],
+        data["aportes_pagos"],
+    )
+
     )
     inv_df = data[\"inversionista\"]; inv_movs_df = data[\"inversionista_movs\"]
     st.success(f"Cliente listo (ID interno: {cid[:8]}).")
