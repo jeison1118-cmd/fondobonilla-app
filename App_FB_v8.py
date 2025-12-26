@@ -897,7 +897,7 @@ with tabs[2]:
             observaciones = st.text_input("Observaciones", key="pay_obs")
             modo_reauto = st.selectbox(
                 "Re‑amortizar automáticamente el abono extra?",
-                options=["No re‑amortizar", "Reducir plazo (mantener cuota)", "Reducir cuota (mantener plazo)"],
+                options=["No re‑amortizar", "Reducir plazo (aumentar cuota)", "Reducir cuota (aumentar plazo)"],
                 key="pay_reauto",
             )
 
@@ -919,7 +919,7 @@ with tabs[2]:
                     plazo_actual = safe_int(pr.get("plazo_meses"), default=1)
 
                     if saldo_despues > 0 and safe_int(adelanto_extra, default=0) > 0 and modo_reauto != "No re‑amortizar":
-                        if modo_reauto == "Reducir plazo (mantener cuota)":
+                        if modo_reauto == "Reducir plazo (aumentar cuota)":
                             n_calc = resolver_plazo_por_cuota(saldo_despues, tasa, cuota_actual)
                             cuota_calc = calcular_cuota_fija(saldo_despues, tasa, n_calc)
                             prestamos.loc[prestamos["prestamo_id"] == pid, ["plazo_meses", "cuota_fija", "plan_inicio", "actualizado_en"]] = [
@@ -929,7 +929,7 @@ with tabs[2]:
                                 datetime.now(),
                             ]
                             st.info(f"Re‑amortización automática aplicada: nuevo plazo {int(n_calc)} meses · cuota {format_cop(cuota_calc)}")
-                        elif modo_reauto == "Reducir cuota (mantener plazo)":
+                        elif modo_reauto == "Reducir cuota (aumentar plazo)":
                             pr_tmp = pr.copy()
                             pr_tmp["plan_inicio"] = to_date(fecha_pago) or date.today()
                             pagadas_prev = contar_cuotas_normales_desde_epoch(pagos, pr_tmp)
