@@ -147,7 +147,8 @@ def get_role():
 def can_edit() -> bool:
     return get_role() == "admin"
 
-# Topbar (derecha): título + login/logout
+
+# Topbar (derecha): título + login/logout (sin sidebar, sin modal)
 col_logo, col_space, col_user = st.columns([3,6,3])
 with col_logo:
     st.markdown(f"### 💰 {APP_NAME}")
@@ -159,37 +160,37 @@ with col_user:
                 st.session_state.pop(k, None)
             st.rerun()
     else:
-        # Botón que abre modal de login
+        # Botón simple para mostrar/ocultar el formulario inline
         if st.button("Iniciar sesión", key="top_login_btn"):
-            st.session_state["show_login_modal"] = True
+            st.session_state["show_login_inline"] = True
 
-# Auto-abrir el modal si no hay sesión
+# Mostrar el login inline automáticamente si no hay sesión (y sin modal)
 if "auth_user" not in st.session_state:
-    st.session_state.setdefault("show_login_modal", True)
-else:
-    st.session_state["show_login_modal"] = False
+    st.session_state.setdefault("show_login_inline", True)
 
-# Modal de login
-if st.session_state.get("show_login_modal", False):
-    with st.modal("Iniciar sesión", key="login_modal", max_width=600):
-        u = st.text_input("Usuario", key="modal_user")
-        p = st.text_input("Contraseña", type="password", key="modal_pwd")
-        col_m1, col_m2 = st.columns([1,1])
-        with col_m1:
-            if st.button("Entrar", key="modal_login_confirm"):
-                if do_login(u, p):
-                    st.session_state["show_login_modal"] = False
-                    st.rerun()
-                else:
-                    st.error("Usuario o contraseña incorrectos")
-        with col_m2:
-            if st.button("Cancelar", key="modal_login_cancel"):
-                st.session_state["show_login_modal"] = False
-                st.rerun()
+if st.session_state.get("show_login_inline", False) and "auth_user" not in st.session_state:
+    # Formulario inline (siempre visible en móvil y desktop)
+    st.divider()
+    st.markdown("#### Iniciar sesión")
+    with st.form("login_inline_form"):
+        u = st.text_input("Usuario", key="inline_user")
+        p = st.text_input("Contraseña", type="password", key="inline_pwd")
+        submitted = st.form_submit_button("Entrar")
+    if submitted:
+        if do_login(u, p):
+            st.session_state["show_login_inline"] = False
+            st.rerun()
+        else:
+            st.error("Usuario o contraseña incorrectos")
+    # Opción para ocultar el formulario si el usuario se arrepiente
+    if st.button("Cancelar", key="inline_cancel"):
+        st.session_state["show_login_inline"] = False
+        st.rerun()
 
 # Gate: si no hay sesión, no renderizar el resto
 if "auth_user" not in st.session_state:
     st.stop()
+
 
 # -------------- UI helpers --------------
 
