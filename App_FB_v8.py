@@ -168,45 +168,57 @@ def inject_css():
     )
 
 # -------------- AUTH (admin / reader) --------------
-import bcrypt
 
-st.set_page_config(page_title=f"{APP_NAME} — UI", page_icon="💰", layout="wide")
+
+import time
+import bcrypt
+import streamlit as st
 
 READ_ONLY_MSG = "Acceso de solo lectura. Solicita rol admin para usar esta sección."
 
-
 def auth_login():
     st.sidebar.markdown("### Iniciar sesión")
-    user = st.sidebar.text_input("Usuario", key="login_user")
-    pwd = st.sidebar.text_input("Contraseña", type="password", key="login_pwd")
-    if st.sidebar.button("Entrar", key="login_btn"):
-        udb = st.secrets.get("users", {})
-        # Busca coincidencia por username
-        for _, u in udb.items():
-            try:
-                if u.get("username") == user:
-                    stored = u.get("password_hash", "")
-                    ok = stored and bcrypt.checkpw(pwd.encode("utf-8"), stored.encode("utf-8"))
-                    if ok:
-                        st.session_state["auth_user"] = user
-                        st.session_state["auth_role"] = u.get("role", "reader")
-                        st.experimental_rerun()
-                    else:
-                        st.sidebar.error("Usuario o contraseña incorrectos")
-                    break
-            except Exception:
-                st.sidebar.error("Error validando credenciales")
-        else:
-            st.sidebar.error("Usuario o contraseña incorrectos")
+    with st.sidebar.form("login_form"):
+        user = st.text_input("Usuario", key="login_user").strip()
+        pwd  = st.text_input("Contraseña", type="password", key="login_pwd")
+        submitted = st.form_submit_button("Entrar")
 
+    if not submitted:
+        return
+
+    udb = st.secrets.get("users", {})
+    # Buscar usuario exacto en el mapa de secrets
+    target = None
+    for _, u in dict(udb).items():
+        if str(u.get("username", "")).strip() == user:
+            target = u
+            break
+
+    if not target:
+        st.sidebar.error("Usuario o contraseña incorrectos")
+        return
+
+    stored = str(target.get("password_hash", "")).strip()
+    try:
+        ok = stored and bcrypt.checkpw(pwd.encode("utf-8"), stored.encode("utf-8"))
+    except Exception:
+        ok = False
+
+    if ok:
+        st.session_state["auth_user"] = user
+        st.session_state["auth_role"] = target.get("role", "reader")
+        # Re-render inmediato y cortar ejecución del ciclo actual
+        st.experimental_rerun()
+        st.stop()
+    else:
+        st.sidebar.error("Usuario o contraseña incorrectos")
+        return
 
 def get_role():
     return st.session_state.get("auth_role", None)
 
-
 def can_edit() -> bool:
     return get_role() == "admin"
-
 
 def logout():
     if st.sidebar.button("Cerrar sesión", key="logout_btn"):
@@ -217,10 +229,11 @@ def logout():
 # Gate de autenticación
 if "auth_user" not in st.session_state:
     auth_login()
-    st.stop()
+    st.stop()  # evita que se pinte el resto del app si aún no hay sesión
 else:
     st.sidebar.success(f"Sesión: {st.session_state['auth_user']} ({st.session_state['auth_role']})")
     logout()
+
 
 # -------------------- Helpers --------------------
 
