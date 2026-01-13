@@ -546,7 +546,10 @@ if sel == TABS[0]:
         # Calcula egresos al inversionista
         pagos_a_inversionista = 0.0
         if inv_movs_df is not None and not inv_movs_df.empty:
-            pagos_a_inversionista = inv_movs_df.loc[inv_movs_df["tipo"].isin(["dividendo", "cancelacion"]), "monto"].sum()
+           egresos_mask = inv_movs_df["tipo"].astype(str).str.strip().isin(["dividendo", "cancelacion"])
+        # Forzar numérico por si algún monto quedó como texto o con formato raro
+        montos_egreso = pd.to_numeric(inv_movs_df.loc[egresos_mask, "monto"], errors="coerce").fillna(0)
+        pagos_a_inversionista = float(montos_egreso.sum())
 
         # Caja neta
         caja_actual = capital_inicial - total_desembolsado + (intereses_cobrados + capital_recuperado + aportes_cobrados) - pagos_a_inversionista
