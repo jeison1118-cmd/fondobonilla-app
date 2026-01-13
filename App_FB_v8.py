@@ -542,17 +542,31 @@ if sel == TABS[0]:
         intereses_cobrados = float(pagos_df.get("interes_aplicado", pd.Series(dtype=float)).sum()) if not pagos_df.empty else 0.0
         capital_recuperado = float(pagos_df.get("capital_aplicado", pd.Series(dtype=float)).sum()) if not pagos_df.empty else 0.0
         aportes_cobrados = float(aportes_pagos_df["monto_pagado"].sum()) if (aportes_pagos_df is not None and not aportes_pagos_df.empty) else 0.0
-        
         # Calcula egresos al inversionista
         pagos_a_inversionista = 0.0
         if inv_movs_df is not None and not inv_movs_df.empty:
-           egresos_mask = inv_movs_df["tipo"].astype(str).str.strip().isin(["dividendo", "cancelacion"])
-        # Forzar numérico por si algún monto quedó como texto o con formato raro
-        montos_egreso = pd.to_numeric(inv_movs_df.loc[egresos_mask, "monto"], errors="coerce").fillna(0)
-        pagos_a_inversionista = float(montos_egreso.sum())
+            egresos_mask = (
+                inv_movs_df["tipo"]
+                .astype(str)
+                .str.strip()
+                .str.lower()
+                .isin(["dividendo", "cancelacion"])
+            )
+            # Forzar numérico por si algún monto quedó como texto o con formato raro
+            montos_egreso = pd.to_numeric(
+                inv_movs_df.loc[egresos_mask, "monto"], errors="coerce"
+            ).fillna(0)
+            pagos_a_inversionista = float(montos_egreso.sum())
+        else:
+            pagos_a_inversionista = 0.0  # explícito por claridad
 
         # Caja neta
-        caja_actual = capital_inicial - total_desembolsado + (intereses_cobrados + capital_recuperado + aportes_cobrados) - pagos_a_inversionista
+        caja_actual = (
+            capital_inicial
+            - total_desembolsado
+            + (intereses_cobrados + capital_recuperado + aportes_cobrados)
+            - pagos_a_inversionista
+        )
         total_prestado = saldo_capital_total
         total_fondo = caja_actual + total_prestado
         pasivo_inv = 0.0
