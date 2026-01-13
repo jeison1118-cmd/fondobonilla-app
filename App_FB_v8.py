@@ -165,23 +165,44 @@ if "auth_user" not in st.session_state:
 else:
     st.session_state["show_login_modal"] = False
 
-# Modal de login
+
+# Modal de login (compatibilidad por versión de Streamlit)
 if st.session_state.get("show_login_modal", False):
-    with st.modal("Iniciar sesión", key="login_modal", max_width=600):
-        u = st.text_input("Usuario", key="modal_user")
-        p = st.text_input("Contraseña", type="password", key="modal_pwd")
-        col_m1, col_m2 = st.columns([1,1])
+    if hasattr(st, "modal"):
+        # Tu flujo original con st.modal (si existe en tu versión)
+        with st.modal("Iniciar sesión", key="login_modal", max_width=600):
+            u = st.text_input("Usuario", key="modal_user")
+            p = st.text_input("Contraseña", type="password", key="modal_pwd")
+            col_m1, col_m2 = st.columns([1, 1])
+            with col_m1:
+                if st.button("Entrar", key="modal_login_confirm"):
+                    if do_login(u, p):
+                        st.session_state["show_login_modal"] = False
+                        st.rerun()
+                    else:
+                        st.error("Usuario o contraseña incorrectos")
+            with col_m2:
+                if st.button("Cancelar", key="modal_login_cancel"):
+                    st.session_state["show_login_modal"] = False
+                    st.rerun()
+    else:
+        # Fallback visual (NO cambia tu lógica de login): formulario inline
+        st.warning("Tu versión de Streamlit no soporta 'st.modal'. Se muestra el login en la página.")
+        u = st.text_input("Usuario", key="modal_user_inline")
+        p = st.text_input("Contraseña", type="password", key="modal_pwd_inline")
+        col_m1, col_m2 = st.columns([1, 1])
         with col_m1:
-            if st.button("Entrar", key="modal_login_confirm"):
+            if st.button("Entrar", key="modal_login_confirm_inline"):
                 if do_login(u, p):
                     st.session_state["show_login_modal"] = False
                     st.rerun()
                 else:
                     st.error("Usuario o contraseña incorrectos")
         with col_m2:
-            if st.button("Cancelar", key="modal_login_cancel"):
+            if st.button("Cancelar", key="modal_login_cancel_inline"):
                 st.session_state["show_login_modal"] = False
                 st.rerun()
+
 
 # Gate: si no hay sesión, no renderizar el resto
 if "auth_user" not in st.session_state:
@@ -1056,3 +1077,4 @@ elif sel == TABS[8]:
             if not movs_show.empty:
                 movs_show["monto"] = movs_show["monto"].apply(format_cop)
             st.dataframe(movs_show, use_container_width=True)
+
