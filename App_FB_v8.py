@@ -132,6 +132,7 @@ def get_data():
     st.session_state["data_cache"] = d
     return d
 
+
 # -------------------- Auth (login en cuerpo, logout en topbar) --------------------
 def auth_login() -> bool:
     """Formulario de login centrado en el cuerpo (sin sidebar)."""
@@ -142,6 +143,7 @@ def auth_login() -> bool:
             user = st.text_input("Usuario", key="login_user").strip()
             pwd = st.text_input("Contraseña", type="password", key="login_pwd")
             submitted = st.form_submit_button("Entrar")
+
         if not submitted:
             return False
 
@@ -151,6 +153,7 @@ def auth_login() -> bool:
             if str(u.get("username", "")).strip() == user:
                 target = u
                 break
+
         if not target:
             st.error("Usuario o contraseña incorrectos")
             return False
@@ -164,6 +167,10 @@ def auth_login() -> bool:
         if ok:
             st.session_state["auth_user"] = user
             st.session_state["auth_role"] = target.get("role", "reader")
+            # 👇 fuerza la recarga para que desaparezca el login y entre al gate ya autenticado
+            st.rerun()
+            # Nota: tras st.rerun(), esta función re-ejecuta el script completo y ya no
+            # volverá a esta rama. El return es decorativo.
             return True
         else:
             st.error("Usuario o contraseña incorrectos")
@@ -184,6 +191,7 @@ def logout():
             for k in ["auth_user", "auth_role"]:
                 st.session_state.pop(k, None)
             st.rerun()
+
 
 # Gate de autenticación (sin sidebar)
 if "auth_user" not in st.session_state:
@@ -1062,3 +1070,4 @@ elif sel == TABS[8]:
         if not movs_show.empty:
             movs_show["monto"] = movs_show["monto"].apply(format_cop)
             st.dataframe(movs_show, use_container_width=True)
+
