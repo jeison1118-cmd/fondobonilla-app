@@ -10,6 +10,7 @@ import uuid
 import os
 import random
 import string
+import streamlit as st
 from io import BytesIO
 from datetime import datetime, date, timedelta
 from dateutil.relativedelta import relativedelta
@@ -30,6 +31,12 @@ GRACIA_DIAS = 5
 MORA_TASA_MENSUAL = 0.02
 SHEET_ID = "1RbVD9oboyVfSPiwHS5B4xD9h9i6cxyXLY9uXhdQx62s"
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets","https://www.googleapis.com/auth/drive"]
+
+
+st.set_page_config(
+    page_title="Fondo Bonilla",
+    page_icon="logo.png"    # archivo en la raíz
+)
 
 st.set_page_config(page_title=f"{APP_NAME} — UI", page_icon="💰", layout="wide", initial_sidebar_state="collapsed")
 
@@ -1070,4 +1077,5 @@ elif sel == TABS[8]:
         if not movs_show.empty:
             movs_show["monto"] = movs_show["monto"].apply(format_cop)
             st.dataframe(movs_show, use_container_width=True)
+
 
