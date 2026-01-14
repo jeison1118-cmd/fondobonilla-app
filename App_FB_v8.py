@@ -10,7 +10,6 @@ import uuid
 import os
 import random
 import string
-import streamlit as st
 from io import BytesIO
 from datetime import datetime, date, timedelta
 from dateutil.relativedelta import relativedelta
@@ -23,6 +22,7 @@ from gspread_dataframe import get_as_dataframe, set_with_dataframe
 from gspread.exceptions import WorksheetNotFound
 import time
 import bcrypt
+import streamlit as st
 
 APP_NAME = "Fondo Bonilla (v8)"
 EXCEL_PATH = "fondo.xlsx"
@@ -34,11 +34,12 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets","https://www.googleapis
 
 
 st.set_page_config(
-    page_title="Fondo Bonilla",
-    page_icon="logo.png"    # archivo en la raíz
+    page_title=f"{APP_NAME} — UI",
+    page_icon="assets/logo.png",   # sube tu PNG a assets/logo.png
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
-st.set_page_config(page_title=f"{APP_NAME} — UI", page_icon="💰", layout="wide", initial_sidebar_state="collapsed")
 
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 # CSS para ocultar completamente la Sidebar y el botón de toggle del header
@@ -1077,5 +1078,6 @@ elif sel == TABS[8]:
         if not movs_show.empty:
             movs_show["monto"] = movs_show["monto"].apply(format_cop)
             st.dataframe(movs_show, use_container_width=True)
+
 
 
