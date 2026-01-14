@@ -34,10 +34,8 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets","https://www.googleapis
 
 
 st.set_page_config(
-    page_title=f"{APP_NAME} — UI",
-    page_icon="assets/logo.png",   # sube tu PNG a assets/logo.png
-    layout="wide",
-    initial_sidebar_state="collapsed"
+    page_title="Fondo Bonilla",
+    page_icon="logo.png"    # archivo en la raíz
 )
 
 
@@ -1078,6 +1076,7 @@ elif sel == TABS[8]:
         if not movs_show.empty:
             movs_show["monto"] = movs_show["monto"].apply(format_cop)
             st.dataframe(movs_show, use_container_width=True)
+
 
 
 
