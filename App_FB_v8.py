@@ -39,6 +39,49 @@ st.set_page_config(
 )
 
 
+# === Inyección PWA para Android + iOS ===
+import streamlit.components.v1 as components
+
+components.html(
+    """
+    <script>
+      (function () {
+        function addTag(tagName, attrs) {
+          var el = document.createElement(tagName);
+          for (var k in attrs) { el.setAttribute(k, attrs[k]); }
+          document.head.appendChild(el);
+        }
+
+        // Manifest PWA
+        addTag("link", {
+          rel: "manifest",
+          href: "/manifest.json"
+        });
+
+        // Favicon
+        addTag("link", {
+          rel: "icon",
+          type: "image/png",
+          href: "/assets/logo-192.png"
+        });
+
+        // iOS: icono especial
+        addTag("link", {
+          rel: "apple-touch-icon",
+          href: "/assets/logo-192.png"
+        });
+
+        // iOS: barra de estado
+        addTag("meta", {
+          name: "apple-mobile-web-app-capable",
+          content: "yes"
+        });
+      })();
+    </script>
+    """,
+    height=0
+)
+
 
 # === [NUEVO] Marca de agua global + utilidades (logo en base64) ===
 import base64
@@ -1354,6 +1397,7 @@ elif sel == TABS[8]:
         if not movs_show.empty:
             movs_show["monto"] = movs_show["monto"].apply(format_cop)
             st.dataframe(movs_show, use_container_width=True)
+
 
 
 
