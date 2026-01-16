@@ -39,98 +39,83 @@ st.set_page_config(
 )
 
 
-# === [NUEVO] Marca de agua global (todas las pestañas) + utilidades ===
-import streamlit.components.v1 as components
+
+# === [NUEVO] Marca de agua global + utilidades (logo en base64) ===
+import base64
 from pathlib import Path
+import streamlit.components.v1 as components
 
 LOGO_PATH = "assets/logo.png"
 
+def _logo_b64():
+    """Devuelve el logo en base64 (o None si no existe)."""
+    try:
+        with open(LOGO_PATH, "rb") as f:
+            return base64.b64encode(f.read()).decode("utf-8")
+    except Exception:
+        return None
+
 def inject_global_watermark_css():
     """Marca de agua sutil para TODA la app (fondo del área principal)."""
-    if Path(LOGO_PATH).exists():
-        st.markdown(
-            f"""
-            <style>
-            /* Capa fija de fondo sobre el contenedor principal */
-            [data-testid="stAppViewContainer"]::before {{
-              content: "";
-              position: fixed;
-              top: 4rem; bottom: 1rem; left: 1rem; right: 1rem;
-              background: url('{LOGO_PATH}') center 42% no-repeat;
-              background-size: 420px;
-              opacity: .035;            /* muy sutil */
-              pointer-events: none;
-              z-index: 0;
-            }}
-            /* Asegurar que el contenido quede por encima */
-            [data-testid="stHeader"] {{ z-index: 1; }}
-            .main {{ z-index: 1; position: relative; }}
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
+    b64 = _logo_b64()
+    if not b64:
+        return
+    st.markdown(
+        f"""
+        <style>
+        /* Capa fija sobre el área principal */
+        [data-testid="stAppViewContainer"]::before {{
+          content: "";
+          position: fixed;
+          top: 4rem; bottom: 1rem; left: 1rem; right: 1rem;
+          background: url("data:image/png;base64,{b64}") center 42% no-repeat;
+          background-size: 420px;
+          opacity: .035;           /* Muy sutil para no molestar */
+          pointer-events: none;
+          z-index: 0;
+        }}
+        [data-testid="stHeader"] {{ z-index: 1; }}
+        .main {{ z-index: 1; position: relative; }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
 def inject_section_watermark_css():
-    """Clase .fb-watermark para poner una marca de agua encima de un bloque concreto."""
-    if Path(LOGO_PATH).exists():
-        st.markdown(
-            f"""
-            <style>
-            .fb-watermark {{
-              position: relative;
-            }}
-            /* Overlay semitransparente por ENCIMA del contenido (visible aunque la tabla sea blanca) */
-            .fb-watermark::after {{
-              content: "";
-              position: absolute; inset: 0;
-              background: url('{LOGO_PATH}') center 38% no-repeat;
-              background-size: 240px;
-              opacity: .08;              /* sutil, pero visible */
-              pointer-events: none;
-              z-index: 5;
-            }}
-            .fb-watermark > * {{
-              position: relative; z-index: 10;
-            }}
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
+    """Clase .fb-watermark para poner una marca de agua visible en un bloque."""
+    b64 = _logo_b64()
+    if not b64:
+        return
+    st.markdown(
+        f"""
+        <style>
+        .fb-watermark {{
+          position: relative;
+        }}
+        /* Overlay por ENCIMA del contenido para que no se pierda en fondos blancos */
+        .fb-watermark::after {{
+          content: "";
+          position: absolute; inset: 0;
+          background: url("data:image/png;base64,{b64}") center 38% no-repeat;
+          background-size: 240px;
+          opacity: .08;             /* Sutil y visible */
+          pointer-events: none;
+          z-index: 5;
+        }}
+        .fb-watermark > * {{
+          position: relative; z-index: 10;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
-# Inyectar marcas de agua (si no existe el PNG, simplemente no se muestran)
+# Activa las marcas de agua (si no existe el PNG, simplemente no se muestran)
 inject_global_watermark_css()
 inject_section_watermark_css()
 
-# === [NUEVO] Soporte de componentes y marca de agua (logo) ===
-import streamlit.components.v1 as components
-from pathlib import Path
 
-LOGO_PATH = "logo.png"
 
-def inject_fb_watermark_css():
-    """Inyecta CSS para mostrar una marca de agua sutil con el logo."""
-    if Path(LOGO_PATH).exists():
-        st.markdown(
-            f"""
-            <style>
-            .fb-watermark {{ position: relative; }}
-            .fb-watermark:before {{
-              content: "";
-              position: absolute; inset: 0;
-              background: url('{LOGO_PATH}') center 35% no-repeat;
-              background-size: 220px;
-              opacity: 0.07;
-              pointer-events: none;
-              z-index: 0;
-            }}
-            .fb-watermark > * {{ position: relative; z-index: 1; }}
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
-
-# Inyectamos (si no existe el PNG, no pasa nada; simplemente no se ve la marca)
-inject_fb_watermark_css()
 
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 # CSS para ocultar completamente la Sidebar y el botón de toggle del header
@@ -928,10 +913,11 @@ elif sel == TABS[3]:
 
 
 
+
 elif sel == TABS[4]:
     st.subheader("Simulador de crédito — método francés")
 
-    # --- NUEVO: nombre de la persona/cliente
+    # --- Nombre de la persona/cliente
     nombre_persona = st.text_input("Nombre de la persona / cliente", key="sim_nombre")
 
     # ---- Entradas del simulador
@@ -955,17 +941,13 @@ elif sel == TABS[4]:
 
     sim = st.session_state.get("sim")
     if sim:
-        # --- ID del contenedor que capturaremos como imagen
-        sim_id = "simulador_captura"
-
-        # --- Comienzo del bloque CAPTURABLE
-        #     Usamos la clase .fb-watermark para que el logo quede como "fondo" sutil por encima
-        if Path(LOGO_PATH).exists():
-            st.markdown(f'<div id="{sim_id}" class="fb-watermark">', unsafe_allow_html=True)
+        # --- Mostramos en la app normal (con marca de agua de sección)
+        if _logo_b64():
+            st.markdown('<div class="fb-watermark">', unsafe_allow_html=True)
         else:
-            st.markdown(f'<div id="{sim_id}">', unsafe_allow_html=True)
+            st.markdown('<div>', unsafe_allow_html=True)
 
-        # Cabecera dentro del bloque a capturar
+        # Cabecera
         top_l, top_r = st.columns([3, 1])
         with top_l:
             st.markdown(
@@ -973,90 +955,176 @@ elif sel == TABS[4]:
                 f"**Fecha de simulación:** {date.today().strftime('%Y-%m-%d')}"
             )
         with top_r:
-            # (opcional) logo a la derecha
-            if Path(LOGO_PATH).exists():
+            if _logo_b64():
                 st.image(LOGO_PATH, width=70)
 
-        # ---- Métricas
+        # Métricas
         c1, c2, c3 = st.columns(3)
         c1.metric("Cuota fija", format_cop(sim["cuota"]))
         c2.metric("Interés total", format_cop(sim["t_int"]))
         c3.metric("Total pagado", format_cop(sim["t_pag"]))
 
-        # ---- Tabla
+        # Tabla
         tabla_show = sim["tabla"].copy()
         for c in ["SALDO INICIAL","CUOTA","INTERES","CAPITAL","SALDO DESPUES DEL PAGO"]:
             tabla_show[c] = tabla_show[c].apply(format_cop)
         st.markdown("### Tabla de amortización")
         st.dataframe(tabla_show, use_container_width=True)
 
-        # --- Fin del bloque CAPTURABLE
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)  # cierra fb-watermark
 
-        # ---- Botón para DESCARGAR imagen PNG del simulador (corregido)
-        # Cargamos html2canvas con <script src="..."> válido y capturamos el bloque por id
+        # --- PREPARAR HTML espejado para CAPTURA dentro del iframe (sin tocar el DOM padre)
+        #     Así evitamos restricciones de iframe/sandbox y descargas bloqueadas.
+        b64 = _logo_b64() or ""
+        P_fmt = format_cop(sim["P"])
+        cuota_fmt = format_cop(sim["cuota"])
+        tint_fmt = format_cop(sim["t_int"])
+        tpag_fmt = format_cop(sim["t_pag"])
+        tasa_pct = f"{round(sim['i_m']*100, 2)}%"
+        f1 = (sim["f_inicio"].strftime("%Y-%m-%d") if isinstance(sim["f_inicio"], date) else str(sim["f_inicio"]))
+        nombre_html = sim.get("nombre") or (nombre_persona or "—")
+
+        # Tabla formateada a HTML
+        tabla_cap = sim["tabla"].copy()
+        for c in ["SALDO INICIAL","CUOTA","INTERES","CAPITAL","SALDO DESPUES DEL PAGO"]:
+            tabla_cap[c] = tabla_cap[c].apply(format_cop)
+        tabla_html = tabla_cap.to_html(index=False, border=0, classes="fb-table")
+        tabla_html = tabla_html.replace('"', '&quot;')  # escapar comillas para incrustar
+
+        # Componente con html2canvas y descarga
         components.html(
             f"""
-            <!DOCTYPE html>
+            <!doctype html>
             <html>
               <head>
                 <meta charset="utf-8" />
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
                 <style>
-                  #btnCapture {{
-                    padding:10px 16px; background:#0c7a43; color:white;
+                  :root {{
+                    --brand: #0c7a43;
+                    --txt: #0C0C0D;
+                    --sub: #6b7280;
+                  }}
+                  body {{
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol';
+                    margin: 0; padding: 0.5rem 0.25rem;
+                    color: var(--txt);
+                  }}
+                  #CAPTURA {{
+                    width: 980px; max-width: 100%;
+                    margin: 0 auto; padding: 16px 18px 22px 18px;
+                    background: #fff;
+                    border: 1px solid #e5e7eb; border-radius: 10px;
+                    position: relative;
+                  }}
+                  /* Marca de agua interna (más visible que la global) */
+                  #CAPTURA::after {{
+                    content: "";
+                    position: absolute; inset: 0;
+                    background: url("data:image/png;base64,{b64}") center 38% no-repeat;
+                    background-size: 280px;
+                    opacity: .10;
+                    pointer-events: none;
+                    z-index: 0;
+                  }}
+                  .cap-wrap > * {{ position: relative; z-index: 1; }}
+                  .brand-row {{
+                    display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom: 8px;
+                  }}
+                  .title {{
+                    font-weight:700; color: var(--brand);
+                  }}
+                  .muted {{ color: var(--sub); font-size: 12px; }}
+                  .metrics {{
+                    display:grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin: 12px 0 8px 0;
+                  }}
+                  .metric {{
+                    border:1px solid #e5e7eb; border-radius:8px; padding:10px 12px;
+                    background:#fafafa;
+                  }}
+                  .metric b {{ display:block; font-size:14px; color:#111827; }}
+                  .metric span {{ font-size:18px; color:#111827; }}
+                  .fb-table {{
+                    border-collapse: collapse; width: 100%;
+                    font-size: 12px;
+                  }}
+                  .fb-table th, .fb-table td {{
+                    border: 1px solid #e5e7eb; padding: 6px 8px; text-align: right;
+                  }}
+                  .fb-table th:first-child, .fb-table td:first-child {{ text-align: center; }}
+                  .btn {{
+                    padding:10px 16px; background:var(--brand); color:#fff;
                     border:none; border-radius:6px; cursor:pointer; font-size:15px;
                   }}
                 </style>
               </head>
               <body>
-                <div style="margin-top:10px;">
-                  <button id="btnCapture">Descargar imagen del simulador</button>
+                <div style="text-align:left;margin:10px 0;">
+                  <button id="btnDl" class="btn">Descargar imagen del simulador</button>
+                </div>
+
+                <div id="CAPTURA">
+                  <div class="cap-wrap">
+                    <div class="brand-row">
+                      <div>
+                        <div class="title">Fondo Bonilla — Simulación</div>
+                        <div class="muted">Cliente: <b>{nombre_html}</b> · Fecha: <b>{date.today().strftime("%Y-%m-%d")}</b></div>
+                        <div class="muted">Monto (P): <b>{P_fmt}</b> · Tasa mensual: <b>{tasa_pct}</b> · Meses: <b>{sim['n']}</b> · 1ª cuota: <b>{f1}</b></div>
+                      </div>
+                    </div>
+
+                    <div class="metrics">
+                      <div class="metric"><b>Cuota fija</b><span>{cuota_fmt}</span></div>
+                      <div class="metric"><b>Interés total</b><span>{tint_fmt}</span></div>
+                      <div class="metric"><b>Total pagado</b><span>{tpag_fmt}</span></div>
+                    </div>
+
+                    <div style="margin-top:8px;">
+                      <div style="font-weight:600;margin-bottom:6px;">Tabla de amortización</div>
+                      <div id="TABLA_HTML"></div>
+                    </div>
+                  </div>
                 </div>
 
                 <script>
-                  (function() {{
-                    const btn = document.getElementById("btnCapture");
-                    btn.addEventListener("click", async function () {{
-                      try {{
-                        const parentDoc = window.parent && window.parent.document ? window.parent.document : document;
-                        const target = parentDoc.getElementById("{sim_id}");
-                        if (!target) {{
-                          alert("No se encontró el bloque del simulador.");
-                          return;
-                        }}
-                        const canvas = await html2canvas(target, {{
-                          scale: 2,
-                          useCORS: true,
-                          backgroundColor: "#ffffff"
-                        }});
-                        const dataURL = canvas.toDataURL("image/png");
+                  // Pintamos la tabla aquí dentro (mismo iframe) para evitar cross-origin
+                  document.getElementById("TABLA_HTML").innerHTML = "{tabla_html}";
 
-                        // Intento de descarga directa
-                        const a = document.createElement("a");
-                        a.href = dataURL;
-                        a.download = "Simulacion_Fondo_Bonilla.png";
-                        document.body.appendChild(a);
-                        a.click();
-                        a.remove();
+                  document.getElementById("btnDl").addEventListener("click", async () => {{
+                    const node = document.getElementById("CAPTURA");
+                    try {{
+                      const canvas = await html2canvas(node, {{
+                        scale: 2,
+                        useCORS: true,
+                        backgroundColor: "#ffffff"
+                      }});
+                      const dataURL = canvas.toDataURL("image/png");
 
-                        // Fallback (algunos navegadores bloquean download en iframe)
-                        setTimeout(function(){{
-                          // Si por alguna razón no descargó, abrimos en nueva pestaña
-                          // para que el usuario pueda guardar manualmente.
-                          window.open(dataURL, "_blank");
-                        }}, 300);
-                      }} catch (e) {{
-                        alert("Error capturando la imagen: " + e);
-                      }}
-                    }});
-                  }})();
+                      // Intento 1: descarga directa
+                      const a = document.createElement("a");
+                      a.href = dataURL;
+                      a.download = "Simulacion_Fondo_Bonilla.png";
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+
+                      // Fallback: abrir en nueva pestaña para guardar manualmente
+                      setTimeout(() => {{
+                        try {{ window.open(dataURL, "_blank"); }} catch (e) {{}}
+                      }}, 250);
+                    }} catch (err) {{
+                      alert("No fue posible generar la imagen: " + err);
+                    }}
+                  }});
                 </script>
               </body>
             </html>
             """,
-            height=90
+            height=680,   # puedes aumentar si tu tabla es muy larga
+            scrolling=True
         )
+
 
 elif sel == TABS[5]:
     st.subheader("Parámetros del fondo")
@@ -1275,6 +1343,7 @@ elif sel == TABS[8]:
         if not movs_show.empty:
             movs_show["monto"] = movs_show["monto"].apply(format_cop)
             st.dataframe(movs_show, use_container_width=True)
+
 
 
 
