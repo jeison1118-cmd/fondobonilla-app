@@ -266,15 +266,18 @@ def get_role():
 def can_edit() -> bool:
     return get_role() == "admin"
 
+
 def logout():
     """Topbar de sesión en el cuerpo (derecha)."""
     c1, c2, c3 = st.columns([6, 3, 2])
     with c3:
         st.caption(f"Sesión: {st.session_state.get('auth_user','')} ({st.session_state.get('auth_role','')})")
         if st.button("Cerrar sesión", key="logout_btn"):
-            for k in ["auth_user", "auth_role"]:
+            # 🔄 Limpiar simulación y otros estados volátiles al cerrar sesión
+            for k in ["auth_user", "auth_role", "sim"]:
                 st.session_state.pop(k, None)
             st.rerun()
+
 
 
 # Gate de autenticación (sin sidebar)
@@ -660,15 +663,13 @@ def build_sim_image(sim: dict, tabla_df: pd.DataFrame, logo_path: str = "assets/
     y += 46
     draw.text((padding, y), f"Cliente: {nombre}", fill=(17, 24, 39, 255), font=font_body)
     y += 24
-    draw.text((padding, y), f"Fecha: {date.today().isoformat()}", fill=(107, 114, 128, 255), font=font_body)
-    y += 24
     draw.text((padding, y),
-              f"Monto (P): {P_fmt}   ·   Tasa mensual: {tasa_pct}   ·   Meses: {sim['n']}   ·   1ª cuota: {f1}",
+              f"Monto : {P_fmt}   ·   Tasa mensual: {tasa_pct}   ·   # Meses: {sim['n']}   ·   Fecha Desembolso: {f1}",
               fill=(17, 24, 39, 255), font=font_body)
     y += 28
     draw.text((padding, y), f"Cuota fija: {cuota_fmt}", fill=(17, 24, 39, 255), font=font_bold)
     y += 22
-    draw.text((padding, y), f"Interés total: {tint_fmt}   ·   Total pagado: {tpag_fmt}",
+    draw.text((padding, y), f"Interés total: {tint_fmt}   ·   Total a pagar: {tpag_fmt}",
               fill=(17, 24, 39, 255), font=font_body)
     y += 28
 
@@ -1353,6 +1354,7 @@ elif sel == TABS[8]:
         if not movs_show.empty:
             movs_show["monto"] = movs_show["monto"].apply(format_cop)
             st.dataframe(movs_show, use_container_width=True)
+
 
 
 
