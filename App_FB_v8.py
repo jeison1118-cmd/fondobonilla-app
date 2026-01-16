@@ -39,6 +39,37 @@ st.set_page_config(
 )
 
 
+# === [NUEVO] Soporte de componentes y marca de agua (logo) ===
+import streamlit.components.v1 as components
+from pathlib import Path
+
+LOGO_PATH = "logo.png"
+
+def inject_fb_watermark_css():
+    """Inyecta CSS para mostrar una marca de agua sutil con el logo."""
+    if Path(LOGO_PATH).exists():
+        st.markdown(
+            f"""
+            <style>
+            .fb-watermark {{ position: relative; }}
+            .fb-watermark:before {{
+              content: "";
+              position: absolute; inset: 0;
+              background: url('{LOGO_PATH}') center 35% no-repeat;
+              background-size: 220px;
+              opacity: 0.07;
+              pointer-events: none;
+              z-index: 0;
+            }}
+            .fb-watermark > * {{ position: relative; z-index: 1; }}
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+
+# Inyectamos (si no existe el PNG, no pasa nada; simplemente no se ve la marca)
+inject_fb_watermark_css()
+
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 # CSS para ocultar completamente la Sidebar y el botón de toggle del header
 st.markdown("""
@@ -833,31 +864,111 @@ elif sel == TABS[3]:
         output.seek(0)
         st.download_button("Descargar 'fondo_export.xlsx'", data=output, file_name="fondo_export.xlsx", key="report_download_link")
 
+
 elif sel == TABS[4]:
     st.subheader("Simulador de crédito — método francés")
+
+    # ---- Entradas del simulador
     colA, colB, colC, colD = st.columns(4)
     principal = colA.number_input("Monto (P)", min_value=0.0, value=1_000_000.0, step=50_000.0, key="sim_monto")
     tasa_text = colB.text_input("Tasa mensual (%)", value="3%", key="sim_tasa")
     n = colC.number_input("Meses (n)", min_value=1, value=6, step=1, key="sim_n")
     f_inicio = colD.date_input("Fecha 1ª cuota", value=date.today(), key="sim_fecha")
+
     if st.button("🧮 Calcular simulación", key="sim_calc"):
         try:
             i_m = parse_percent(tasa_text)
             cuota, t_int, t_pag, tabla = simulador_cuotas_fijas(principal, i_m, int(n), f_inicio)
-            st.session_state["sim"] = {"P": principal, "i_m": i_m, "n": int(n), "f_inicio": f_inicio, "cuota": cuota, "t_int": t_int, "t_pag": t_pag, "tabla": tabla}
+            st.session_state["sim"] = {
+                "P": principal, "i_m": i_m, "n": int(n), "f_inicio": f_inicio,
+                "cuota": cuota, "t_int": t_int, "t_pag": t_pag, "tabla": tabla
+            }
         except Exception as e:
             st.error(f"Error en simulación: {e}")
+
     sim = st.session_state.get("sim")
     if sim:
+        # --- ID del contenedor que capturaremos como imagen
+        sim_id = "simulador_captura"
+
+        # --- Comienzo del bloque CAPTURABLE (incluye marca de agua si hay logo)
+        if Path(LOGO_PATH).exists():
+            st.markdown(f'<div id="{sim_id}" class="fb-watermark">', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div id="{sim_id}">', unsafe_allow_html=True)
+
+        # (Opcional) Logo arriba del simulador; quedará en la imagen
+        if Path(LOGO_PATH).exists():
+            st.image(LOGO_PATH, width=90)
+
+        # ---- Métricas
         c1, c2, c3 = st.columns(3)
         c1.metric("Cuota fija", format_cop(sim["cuota"]))
         c2.metric("Interés total", format_cop(sim["t_int"]))
         c3.metric("Total pagado", format_cop(sim["t_pag"]))
+
+        # ---- Tabla
         tabla_show = sim["tabla"].copy()
         for c in ["SALDO INICIAL","CUOTA","INTERES","CAPITAL","SALDO DESPUES DEL PAGO"]:
             tabla_show[c] = tabla_show[c].apply(format_cop)
         st.markdown("### Tabla de amortización")
         st.dataframe(tabla_show, use_container_width=True)
+
+        # --- Fin del bloque CAPTURABLE
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # ---- Botón para DESCARGAR imagen PNG del simulador (captura del bloque)
+        # Usamos html2canvas en un componente <iframe> y accedemos al DOM del padre.
+        components.html(
+            f"""
+            <html>
+              <head>
+                <meta charset="utf-8" />
+                <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+              </head>
+              <body>
+                <div style="margin-top:10px;">
+                  <button id="btnCapture"
+                          style="padding:10px 16px;background:#0c7a43;color:white;border:none;border-radius:6px;cursor:pointer;font-size:15px;">
+                    Descargar imagen del simulador
+                  </button>
+                </div>
+                <script>
+                  (function() {{
+                    const btn = document.getElementById("btnCapture");
+                    btn.addEventListener("click", function() {{
+                      try {{
+                        const parentDoc = window.parent.document;
+                        const target = parentDoc.getElementById("{sim_id}");
+                        if (!target) {{
+                          alert("No se encontró el bloque del simulador.");
+                          return;
+                        }}
+                        html2canvas(target, {{
+                          scale: 2,
+                          useCORS: true,
+                          backgroundColor: "#ffffff"
+                        }}).then(canvas => {{
+                          const dataURL = canvas.toDataURL("image/png");
+                          const a = document.createElement("a");
+                          a.href = dataURL;
+                          a.download = "Simulacion_Fondo_Bonilla.png";
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                        }});
+                      }} catch (err) {{
+                        alert("No fue posible generar la imagen. " + err);
+                      }}
+                    }});
+                  }})();
+                </script>
+              </body>
+            </html>
+            """,
+            height=80
+        )
+
 
 elif sel == TABS[5]:
     st.subheader("Parámetros del fondo")
@@ -1076,6 +1187,7 @@ elif sel == TABS[8]:
         if not movs_show.empty:
             movs_show["monto"] = movs_show["monto"].apply(format_cop)
             st.dataframe(movs_show, use_container_width=True)
+
 
 
 
