@@ -39,6 +39,68 @@ st.set_page_config(
 )
 
 
+# === [NUEVO] Marca de agua global (todas las pestañas) + utilidades ===
+import streamlit.components.v1 as components
+from pathlib import Path
+
+LOGO_PATH = "assets/logo.png"
+
+def inject_global_watermark_css():
+    """Marca de agua sutil para TODA la app (fondo del área principal)."""
+    if Path(LOGO_PATH).exists():
+        st.markdown(
+            f"""
+            <style>
+            /* Capa fija de fondo sobre el contenedor principal */
+            [data-testid="stAppViewContainer"]::before {{
+              content: "";
+              position: fixed;
+              top: 4rem; bottom: 1rem; left: 1rem; right: 1rem;
+              background: url('{LOGO_PATH}') center 42% no-repeat;
+              background-size: 420px;
+              opacity: .035;            /* muy sutil */
+              pointer-events: none;
+              z-index: 0;
+            }}
+            /* Asegurar que el contenido quede por encima */
+            [data-testid="stHeader"] {{ z-index: 1; }}
+            .main {{ z-index: 1; position: relative; }}
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+
+def inject_section_watermark_css():
+    """Clase .fb-watermark para poner una marca de agua encima de un bloque concreto."""
+    if Path(LOGO_PATH).exists():
+        st.markdown(
+            f"""
+            <style>
+            .fb-watermark {{
+              position: relative;
+            }}
+            /* Overlay semitransparente por ENCIMA del contenido (visible aunque la tabla sea blanca) */
+            .fb-watermark::after {{
+              content: "";
+              position: absolute; inset: 0;
+              background: url('{LOGO_PATH}') center 38% no-repeat;
+              background-size: 240px;
+              opacity: .08;              /* sutil, pero visible */
+              pointer-events: none;
+              z-index: 5;
+            }}
+            .fb-watermark > * {{
+              position: relative; z-index: 10;
+            }}
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+
+# Inyectar marcas de agua (si no existe el PNG, simplemente no se muestran)
+inject_global_watermark_css()
+inject_section_watermark_css()
+
 # === [NUEVO] Soporte de componentes y marca de agua (logo) ===
 import streamlit.components.v1 as components
 from pathlib import Path
@@ -865,8 +927,12 @@ elif sel == TABS[3]:
         st.download_button("Descargar 'fondo_export.xlsx'", data=output, file_name="fondo_export.xlsx", key="report_download_link")
 
 
+
 elif sel == TABS[4]:
     st.subheader("Simulador de crédito — método francés")
+
+    # --- NUEVO: nombre de la persona/cliente
+    nombre_persona = st.text_input("Nombre de la persona / cliente", key="sim_nombre")
 
     # ---- Entradas del simulador
     colA, colB, colC, colD = st.columns(4)
@@ -881,7 +947,8 @@ elif sel == TABS[4]:
             cuota, t_int, t_pag, tabla = simulador_cuotas_fijas(principal, i_m, int(n), f_inicio)
             st.session_state["sim"] = {
                 "P": principal, "i_m": i_m, "n": int(n), "f_inicio": f_inicio,
-                "cuota": cuota, "t_int": t_int, "t_pag": t_pag, "tabla": tabla
+                "cuota": cuota, "t_int": t_int, "t_pag": t_pag, "tabla": tabla,
+                "nombre": nombre_persona
             }
         except Exception as e:
             st.error(f"Error en simulación: {e}")
@@ -891,15 +958,24 @@ elif sel == TABS[4]:
         # --- ID del contenedor que capturaremos como imagen
         sim_id = "simulador_captura"
 
-        # --- Comienzo del bloque CAPTURABLE (incluye marca de agua si hay logo)
+        # --- Comienzo del bloque CAPTURABLE
+        #     Usamos la clase .fb-watermark para que el logo quede como "fondo" sutil por encima
         if Path(LOGO_PATH).exists():
             st.markdown(f'<div id="{sim_id}" class="fb-watermark">', unsafe_allow_html=True)
         else:
             st.markdown(f'<div id="{sim_id}">', unsafe_allow_html=True)
 
-        # (Opcional) Logo arriba del simulador; quedará en la imagen
-        if Path(LOGO_PATH).exists():
-            st.image(LOGO_PATH, width=90)
+        # Cabecera dentro del bloque a capturar
+        top_l, top_r = st.columns([3, 1])
+        with top_l:
+            st.markdown(
+                f"**Cliente:** {sim.get('nombre') or (nombre_persona or '—')}  \n"
+                f"**Fecha de simulación:** {date.today().strftime('%Y-%m-%d')}"
+            )
+        with top_r:
+            # (opcional) logo a la derecha
+            if Path(LOGO_PATH).exists():
+                st.image(LOGO_PATH, width=70)
 
         # ---- Métricas
         c1, c2, c3 = st.columns(3)
@@ -917,48 +993,61 @@ elif sel == TABS[4]:
         # --- Fin del bloque CAPTURABLE
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # ---- Botón para DESCARGAR imagen PNG del simulador (captura del bloque)
-        # Usamos html2canvas en un componente <iframe> y accedemos al DOM del padre.
+        # ---- Botón para DESCARGAR imagen PNG del simulador (corregido)
+        # Cargamos html2canvas con <script src="..."> válido y capturamos el bloque por id
         components.html(
             f"""
+            <!DOCTYPE html>
             <html>
               <head>
                 <meta charset="utf-8" />
-                <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+                <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+                <style>
+                  #btnCapture {{
+                    padding:10px 16px; background:#0c7a43; color:white;
+                    border:none; border-radius:6px; cursor:pointer; font-size:15px;
+                  }}
+                </style>
               </head>
               <body>
                 <div style="margin-top:10px;">
-                  <button id="btnCapture"
-                          style="padding:10px 16px;background:#0c7a43;color:white;border:none;border-radius:6px;cursor:pointer;font-size:15px;">
-                    Descargar imagen del simulador
-                  </button>
+                  <button id="btnCapture">Descargar imagen del simulador</button>
                 </div>
+
                 <script>
                   (function() {{
                     const btn = document.getElementById("btnCapture");
-                    btn.addEventListener("click", function() {{
+                    btn.addEventListener("click", async function () {{
                       try {{
-                        const parentDoc = window.parent.document;
+                        const parentDoc = window.parent && window.parent.document ? window.parent.document : document;
                         const target = parentDoc.getElementById("{sim_id}");
                         if (!target) {{
                           alert("No se encontró el bloque del simulador.");
                           return;
                         }}
-                        html2canvas(target, {{
+                        const canvas = await html2canvas(target, {{
                           scale: 2,
                           useCORS: true,
                           backgroundColor: "#ffffff"
-                        }}).then(canvas => {{
-                          const dataURL = canvas.toDataURL("image/png");
-                          const a = document.createElement("a");
-                          a.href = dataURL;
-                          a.download = "Simulacion_Fondo_Bonilla.png";
-                          document.body.appendChild(a);
-                          a.click();
-                          document.body.removeChild(a);
                         }});
-                      }} catch (err) {{
-                        alert("No fue posible generar la imagen. " + err);
+                        const dataURL = canvas.toDataURL("image/png");
+
+                        // Intento de descarga directa
+                        const a = document.createElement("a");
+                        a.href = dataURL;
+                        a.download = "Simulacion_Fondo_Bonilla.png";
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+
+                        // Fallback (algunos navegadores bloquean download en iframe)
+                        setTimeout(function(){{
+                          // Si por alguna razón no descargó, abrimos en nueva pestaña
+                          // para que el usuario pueda guardar manualmente.
+                          window.open(dataURL, "_blank");
+                        }}, 300);
+                      }} catch (e) {{
+                        alert("Error capturando la imagen: " + e);
                       }}
                     }});
                   }})();
@@ -966,9 +1055,8 @@ elif sel == TABS[4]:
               </body>
             </html>
             """,
-            height=80
+            height=90
         )
-
 
 elif sel == TABS[5]:
     st.subheader("Parámetros del fondo")
@@ -1187,6 +1275,7 @@ elif sel == TABS[8]:
         if not movs_show.empty:
             movs_show["monto"] = movs_show["monto"].apply(format_cop)
             st.dataframe(movs_show, use_container_width=True)
+
 
 
 
