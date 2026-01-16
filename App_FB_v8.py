@@ -1054,7 +1054,7 @@ elif sel == TABS[4]:
     principal = colA.number_input("Monto (P)", min_value=0.0, value=1_000_000.0, step=50_000.0, key="sim_monto")
     tasa_text = colB.text_input("Tasa mensual (%)", value="3%", key="sim_tasa")
     n = colC.number_input("Meses (n)", min_value=1, value=6, step=1, key="sim_n")
-    f_inicio = colD.date_input("Fecha 1ª cuota", value=date.today(), key="sim_fecha")
+    f_inicio = colD.date_input("Fecha Desembolso", value=date.today(), key="sim_fecha")
 
     if st.button("🧮 Calcular simulación", key="sim_calc"):
         try:
@@ -1353,6 +1353,7 @@ elif sel == TABS[8]:
         if not movs_show.empty:
             movs_show["monto"] = movs_show["monto"].apply(format_cop)
             st.dataframe(movs_show, use_container_width=True)
+
 
 
 
