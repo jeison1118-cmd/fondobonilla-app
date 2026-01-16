@@ -609,6 +609,135 @@ def registrar_pago_cuota(prestamos_df, pagos_df, prestamo_id, fecha_pago, adelan
     pagos_df = pd.concat([pagos_df, pd.DataFrame([pago_row])], ignore_index=True)
     return prestamos_df, pagos_df, pago_row
 
+
+# === Exportar simulación como imagen PNG (servidor) ===
+from PIL import Image, ImageDraw, ImageFont
+
+def build_sim_image(sim: dict, tabla_df: pd.DataFrame, logo_path: str = "assets/logo.png") -> bytes:
+    """
+    Genera una imagen PNG con:
+    - Título y datos del cliente/fecha
+    - Métricas clave (cuota, interés total, total pagado)
+    - Tabla de amortización (primeras N filas)
+    - Marca de agua con el logo (si existe)
+    Retorna los bytes del PNG listo para descargar.
+    """
+    # --- Parámetros de layout
+    W = 1200
+    padding = 30
+    row_h = 28
+    max_rows = 30  # limita filas para que no quede gigante
+
+    # --- Formateos
+    P_fmt = format_cop(sim["P"])
+    cuota_fmt = format_cop(sim["cuota"])
+    tint_fmt = format_cop(sim["t_int"])
+    tpag_fmt = format_cop(sim["t_pag"])
+    tasa_pct = f"{round(sim['i_m']*100, 2)}%"
+    f1 = (sim["f_inicio"].strftime("%Y-%m-%d") if isinstance(sim["f_inicio"], date) else str(sim["f_inicio"]))
+    nombre = sim.get("nombre") or "—"
+
+    # --- Altura estimada
+    rows = min(len(tabla_df), max_rows)
+    H = 260 + rows*row_h + 50  # header + métricas + tabla + margen
+
+    # --- Canvas
+    img = Image.new("RGBA", (W, H), (255, 255, 255, 255))
+    draw = ImageDraw.Draw(img)
+
+    # --- Fuentes (con fallback)
+    try:
+        font_title = ImageFont.truetype("DejaVuSans-Bold.ttf", 32)
+        font_body  = ImageFont.truetype("DejaVuSans.ttf", 16)
+        font_bold  = ImageFont.truetype("DejaVuSans-Bold.ttf", 16)
+        font_small = ImageFont.truetype("DejaVuSans.ttf", 13)
+    except Exception:
+        font_title = font_body = font_bold = font_small = ImageFont.load_default()
+
+    # --- Título y datos
+    y = padding
+    draw.text((padding, y), "Fondo Bonilla — Simulación", fill=(12, 122, 67, 255), font=font_title)
+    y += 46
+    draw.text((padding, y), f"Cliente: {nombre}", fill=(17, 24, 39, 255), font=font_body)
+    y += 24
+    draw.text((padding, y), f"Fecha: {date.today().isoformat()}", fill=(107, 114, 128, 255), font=font_body)
+    y += 24
+    draw.text((padding, y),
+              f"Monto (P): {P_fmt}   ·   Tasa mensual: {tasa_pct}   ·   Meses: {sim['n']}   ·   1ª cuota: {f1}",
+              fill=(17, 24, 39, 255), font=font_body)
+    y += 28
+    draw.text((padding, y), f"Cuota fija: {cuota_fmt}", fill=(17, 24, 39, 255), font=font_bold)
+    y += 22
+    draw.text((padding, y), f"Interés total: {tint_fmt}   ·   Total pagado: {tpag_fmt}",
+              fill=(17, 24, 39, 255), font=font_body)
+    y += 28
+
+    # --- Marca de agua (logo)
+    try:
+        lp = Path(logo_path)
+        if lp.exists():
+            logo = Image.open(lp).convert("RGBA")
+            lw = 380
+            ratio = lw / float(logo.width)
+            lh = int(logo.height * ratio)
+            logo = logo.resize((lw, lh), Image.LANCZOS)
+            # opacidad sutil
+            alpha = logo.split()[3].point(lambda a: int(a * 0.12))
+            logo.putalpha(alpha)
+            # centro aprox
+            img.paste(logo, ((W - lw)//2, (H - lh)//3), logo)
+    except Exception:
+        pass
+
+    # --- Tabla (cabecera + filas)
+    cols = ["# CUOTA","MES","SALDO INICIAL","CUOTA","INTERES","CAPITAL","SALDO DESPUES DEL PAGO"]
+    col_widths = [90, 140, 170, 140, 140, 140, 230]
+    x0 = padding
+    y0 = y + 8
+
+    # cabecera
+    draw.rectangle([x0-4, y0-6, x0 + sum(col_widths)+4, y0 + row_h], fill=(245,247,249,255), outline=(229,231,235,255))
+    x = x0
+    for i, c in enumerate(cols):
+        draw.text((x+6, y0), c, fill=(17,24,39,255), font=font_bold)
+        x += col_widths[i]
+    y = y0 + row_h + 4
+
+    # normalizar/formatos
+    df = tabla_df.copy()
+    df["MES"] = df["MES"].apply(lambda d: to_date(d).strftime("%Y-%m") if to_date(d) else str(d))
+
+    for i in range(rows):
+        x = x0
+        r = df.iloc[i]
+        vals = [
+            str(r["# CUOTA"]),
+            r["MES"],
+            format_cop(r["SALDO INICIAL"]),
+            format_cop(r["CUOTA"]),
+            format_cop(r["INTERES"]),
+            format_cop(r["CAPITAL"]),
+            format_cop(r["SALDO DESPUES DEL PAGO"]),
+        ]
+        # zebra
+        if i % 2 == 0:
+            draw.rectangle([x-4, y-4, x + sum(col_widths)+4, y + row_h-6], fill=(250,250,250,255))
+        for j, txt in enumerate(vals):
+            draw.text((x+6, y), txt, fill=(17,24,39,255), font=font_small)
+            x += col_widths[j]
+        y += row_h
+
+    if len(df) > rows:
+        draw.text((x0, y+8), f"… {len(df)-rows} filas más", fill=(107,114,128,255), font=font_small)
+
+    # --- A PNG
+    out = BytesIO()
+    img.convert("RGB").save(out, format="PNG", optimize=True)
+    out.seek(0)
+    return out.getvalue()
+
+
+
 # -------------------- Layout (sin sidebar) --------------------
 data = get_data()
 (clientes, prestamos, pagos, parametros, integrantes, aportes_tarifas, aportes_pagos) = (
@@ -991,139 +1120,20 @@ elif sel == TABS[4]:
         tabla_html = tabla_cap.to_html(index=False, border=0, classes="fb-table")
         tabla_html = tabla_html.replace('"', '&quot;')  # escapar comillas para incrustar
 
-        # Componente con html2canvas y descarga
-        components.html(
-            f"""
-            <!doctype html>
-            <html>
-              <head>
-                <meta charset="utf-8" />
-                <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-                <style>
-                  :root {{
-                    --brand: #0c7a43;
-                    --txt: #0C0C0D;
-                    --sub: #6b7280;
-                  }}
-                  body {{
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol';
-                    margin: 0; padding: 0.5rem 0.25rem;
-                    color: var(--txt);
-                  }}
-                  #CAPTURA {{
-                    width: 980px; max-width: 100%;
-                    margin: 0 auto; padding: 16px 18px 22px 18px;
-                    background: #fff;
-                    border: 1px solid #e5e7eb; border-radius: 10px;
-                    position: relative;
-                  }}
-                  /* Marca de agua interna (más visible que la global) */
-                  #CAPTURA::after {{
-                    content: "";
-                    position: absolute; inset: 0;
-                    background: url("data:image/png;base64,{b64}") center 38% no-repeat;
-                    background-size: 280px;
-                    opacity: .10;
-                    pointer-events: none;
-                    z-index: 0;
-                  }}
-                  .cap-wrap > * {{ position: relative; z-index: 1; }}
-                  .brand-row {{
-                    display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom: 8px;
-                  }}
-                  .title {{
-                    font-weight:700; color: var(--brand);
-                  }}
-                  .muted {{ color: var(--sub); font-size: 12px; }}
-                  .metrics {{
-                    display:grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin: 12px 0 8px 0;
-                  }}
-                  .metric {{
-                    border:1px solid #e5e7eb; border-radius:8px; padding:10px 12px;
-                    background:#fafafa;
-                  }}
-                  .metric b {{ display:block; font-size:14px; color:#111827; }}
-                  .metric span {{ font-size:18px; color:#111827; }}
-                  .fb-table {{
-                    border-collapse: collapse; width: 100%;
-                    font-size: 12px;
-                  }}
-                  .fb-table th, .fb-table td {{
-                    border: 1px solid #e5e7eb; padding: 6px 8px; text-align: right;
-                  }}
-                  .fb-table th:first-child, .fb-table td:first-child {{ text-align: center; }}
-                  .btn {{
-                    padding:10px 16px; background:var(--brand); color:#fff;
-                    border:none; border-radius:6px; cursor:pointer; font-size:15px;
-                  }}
-                </style>
-              </head>
-              <body>
-                <div style="text-align:left;margin:10px 0;">
-                  <button id="btnDl" class="btn">Descargar imagen del simulador</button>
-                </div>
 
-                <div id="CAPTURA">
-                  <div class="cap-wrap">
-                    <div class="brand-row">
-                      <div>
-                        <div class="title">Fondo Bonilla — Simulación</div>
-                        <div class="muted">Cliente: <b>{nombre_html}</b> · Fecha: <b>{date.today().strftime("%Y-%m-%d")}</b></div>
-                        <div class="muted">Monto (P): <b>{P_fmt}</b> · Tasa mensual: <b>{tasa_pct}</b> · Meses: <b>{sim['n']}</b> · 1ª cuota: <b>{f1}</b></div>
-                      </div>
-                    </div>
+        # === Botón de descarga confiable (servidor) ===
+        try:
+            img_bytes = build_sim_image(sim, sim["tabla"], LOGO_PATH)
+            st.download_button(
+                "⬇️ Descargar imagen del simulador (PNG)",
+                data=img_bytes,
+                file_name="Simulacion_Fondo_Bonilla.png",
+                mime="image/png",
+                key="dl_sim_png_server"
+            )
+        except Exception as e:
+            st.warning(f"No fue posible generar la imagen en el servidor: {e}")
 
-                    <div class="metrics">
-                      <div class="metric"><b>Cuota fija</b><span>{cuota_fmt}</span></div>
-                      <div class="metric"><b>Interés total</b><span>{tint_fmt}</span></div>
-                      <div class="metric"><b>Total pagado</b><span>{tpag_fmt}</span></div>
-                    </div>
-
-                    <div style="margin-top:8px;">
-                      <div style="font-weight:600;margin-bottom:6px;">Tabla de amortización</div>
-                      <div id="TABLA_HTML"></div>
-                    </div>
-                  </div>
-                </div>
-
-                <script>
-                  // Pintamos la tabla aquí dentro (mismo iframe) para evitar cross-origin
-                  document.getElementById("TABLA_HTML").innerHTML = "{tabla_html}";
-
-                  document.getElementById("btnDl").addEventListener("click", async () => {{
-                    const node = document.getElementById("CAPTURA");
-                    try {{
-                      const canvas = await html2canvas(node, {{
-                        scale: 2,
-                        useCORS: true,
-                        backgroundColor: "#ffffff"
-                      }});
-                      const dataURL = canvas.toDataURL("image/png");
-
-                      // Intento 1: descarga directa
-                      const a = document.createElement("a");
-                      a.href = dataURL;
-                      a.download = "Simulacion_Fondo_Bonilla.png";
-                      document.body.appendChild(a);
-                      a.click();
-                      a.remove();
-
-                      // Fallback: abrir en nueva pestaña para guardar manualmente
-                      setTimeout(() => {{
-                        try {{ window.open(dataURL, "_blank"); }} catch (e) {{}}
-                      }}, 250);
-                    }} catch (err) {{
-                      alert("No fue posible generar la imagen: " + err);
-                    }}
-                  }});
-                </script>
-              </body>
-            </html>
-            """,
-            height=680,   # puedes aumentar si tu tabla es muy larga
-            scrolling=True
-        )
 
 
 elif sel == TABS[5]:
@@ -1343,6 +1353,7 @@ elif sel == TABS[8]:
         if not movs_show.empty:
             movs_show["monto"] = movs_show["monto"].apply(format_cop)
             st.dataframe(movs_show, use_container_width=True)
+
 
 
 
