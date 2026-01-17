@@ -32,48 +32,65 @@ MORA_TASA_MENSUAL = 0.02
 SHEET_ID = "1RbVD9oboyVfSPiwHS5B4xD9h9i6cxyXLY9uXhdQx62s"
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets","https://www.googleapis.com/auth/drive"]
 
+# --- Config de página (debe ir primero) ---
 
 st.set_page_config(
     page_title="Fondo Bonilla",
-    page_icon="logo.png"    # archivo en la raíz
+    page_icon="assets/logo.png",   # usa tu logo en assets
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
 
-# --- Fix Toolbar/header: asegurar que los clics no queden bloqueados ---
-st.markdown("""
-<style>
-/* 1) Que el header/toolbar esté por encima de cualquier overlay */
-[data-testid="stHeader"] { 
-  position: relative; 
-  z-index: 1000 !important; 
-}
-
-/* 2) Rehabilitar el Toolbar si alguna regla previa lo desactivó */
-[data-testid="stToolbar"] { 
-  visibility: visible !important; 
-  opacity: 1 !important; 
-  pointer-events: auto !important; 
-}
-
-/* 3) Evitar que cualquier overlay intercepte clics del header */
-[data-testid="stAppViewContainer"]::before,
-.fb-watermark::after {
-  pointer-events: none !important;
-}
-
-/* 4) Por si algún CSS previo ocultó el botón del menú o su área clickable */
-header [role="button"],
-[data-testid="baseButton-headerNoPadding
 
 
+# =========================================================
+# 1) FIX Toolbar/header: asegurar que los clics no queden bloqueados
+# =========================================================
 
 
+st.markdown(
+    """
+    <style>
+    /* 1) Que el header/toolbar esté por encima de cualquier overlay */
+    [data-testid="stHeader"] { 
+      position: relative; 
+      z-index: 1000 !important; 
+    }
+
+    /* 2) Rehabilitar el Toolbar si alguna regla previa lo desactivó */
+    [data-testid="stToolbar"] { 
+      visibility: visible !important; 
+      opacity: 1 !important; 
+      pointer-events: auto !important; 
+    }
+
+    /* 3) Evitar que cualquier overlay intercepte clics del header */
+    [data-testid="stAppViewContainer"]::before,
+    .fb-watermark::after {
+      pointer-events: none !important;
+    }
+
+    /* 4) Por si algún CSS previo ocultó el botón del menú o su área clickable */
+    header [role="button"],
+    [data-testid="baseButton-headerNoPadding"],
+    button[kind="header"],
+    button[title="View app menu"] {
+      pointer-events: auto !important;
+      opacity: 1 !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 
-
+# =========================================================
+# 2) Inyección PWA: manifest + iconos usando URLs públicas (GitHub Raw)
+#    NOTA: Todo va DENTRO de un string. No dejes líneas sueltas fuera.
+# =========================================================
 import streamlit.components.v1 as components
 
-# Inyecta manifest e iconos desde URLs públicas (GitHub Raw). Todo va dentro del string.
 components.html(
     """
     <link rel="manifest" href="https://raw.githubusercontent.com/jeison1118-cmd/fondobonilla-app/main/manifest.json">
@@ -85,18 +102,14 @@ components.html(
 )
 
 
-
-
-
-# === [NUEVO] Marca de agua global + utilidades (logo en base64) ===
+# =========================================================
+# 3) Marca de agua global + por sección (logo en base64)
+# =========================================================
 import base64
-from pathlib import Path
-import streamlit.components.v1 as components
 
 LOGO_PATH = "assets/logo.png"
 
 def _logo_b64():
-    """Devuelve el logo en base64 (o None si no existe)."""
     try:
         with open(LOGO_PATH, "rb") as f:
             return base64.b64encode(f.read()).decode("utf-8")
@@ -140,7 +153,7 @@ def inject_section_watermark_css():
         .fb-watermark {{
           position: relative;
         }}
-        /* Overlay por ENCIMA del contenido para que no se pierda en fondos blancos */
+        /* Overlay por ENCIMA del contenido (visible aunque la tabla sea blanca) */
         .fb-watermark::after {{
           content: "";
           position: absolute; inset: 0;
@@ -158,16 +171,16 @@ def inject_section_watermark_css():
         unsafe_allow_html=True
     )
 
-# Activa las marcas de agua (si no existe el PNG, simplemente no se muestran)
+# Activar marcas de agua (si no existe el PNG, no se muestran)
 inject_global_watermark_css()
 inject_section_watermark_css()
 
 
-
-
-# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-# CSS para ocultar completamente la Sidebar y el botón de toggle del header
-st.markdown("""
+# =========================================================
+# 4) CSS para ocultar completamente la Sidebar y su botón
+# =========================================================
+st.markdown(
+    """
     <style>
     /* Oculta la sidebar completa */
     [data-testid="stSidebar"] {display: none !important;}
@@ -176,7 +189,10 @@ st.markdown("""
     /* Asegura ancho completo del main cuando no hay sidebar */
     .main {margin-left: 0rem !important;}
     </style>
-""", unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True
+)
+
 # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 READ_ONLY_MSG = "Acceso de solo lectura. Solicita rol admin para usar esta sección."
@@ -1402,6 +1418,7 @@ elif sel == TABS[8]:
         if not movs_show.empty:
             movs_show["monto"] = movs_show["monto"].apply(format_cop)
             st.dataframe(movs_show, use_container_width=True)
+
 
 
 
