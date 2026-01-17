@@ -66,23 +66,26 @@ header [role="button"],
 [data-testid="baseButton-headerNoPadding
 
 
+
 import streamlit.components.v1 as components
 
+# Inyecta manifest y los íconos usando URLs públicas (GitHub Raw)
 components.html(
     """
-    https://raw.githubusercontent.com/jeison1118-cmd/fondobonilla-app/main/manifest.json
-    
-    <!-- Favicon general -->
-    https://raw.githubusercontent.com/jeison1118-cmd/fondobonilla-app/main/assets/logo-192.png
+    <link rel="manifest" href="https://raw.githubusercontent.com/jeison1118-cmd/fondobonilla-app/main/manifest.json">
 
-    <!-- Icono iOS -->
+    <!-- Favicon general (por compatibilidad) -->
+    <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/jeison1118-cmd/fondobonilla-app/main/assets/logo-192.png">
+
+    <!-- iOS: icono especial (180x180 exacto) -->
     <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/jeison1118-cmd/fondobonilla-app/main/assets/apple-touch-icon.png">
 
-    <!-- Forzar modo app en iOS -->
+    <!-- iOS: abrir como app a pantalla completa -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     """,
     height=0
 )
+
 
 
 
@@ -1400,6 +1403,7 @@ elif sel == TABS[8]:
         if not movs_show.empty:
             movs_show["monto"] = movs_show["monto"].apply(format_cop)
             st.dataframe(movs_show, use_container_width=True)
+
 
 
 
