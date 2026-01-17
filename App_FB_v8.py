@@ -69,24 +69,25 @@ header [role="button"],
 
 
 
+
 import streamlit.components.v1 as components
 
-# Inyecta manifest e iconos desde URLs públicas (GitHub Raw)
+# Inyección PWA: manifest + iconos (USANDO ETIQUETAS <link> / <meta> dentro de un string)
 components.html(
     """
     <link rel="manifest"
-          href="https://raw.githubusercontent.com/jeison1118-cmd/fondobonilla-app/main/manifest.json">
+          href="https://raw.githubusercontent.com/jeison1118-cmd/fondobonilla-app/main/manifest.json" />
 
-    <!-- Favicon general (compatibilidad) -->
+    <!-- Favicon (compatibilidad general) -->
     <link rel="icon" type="image/png"
-          href="https://raw.githubusercontent.com/jeison1118-cmd/fondobonilla-app/main/assets/logo-192.png">
+          href="https://raw.githubusercontent.com/jeison1118-cmd/fondobonilla-app/main/assets/logo-192.png" />
 
-    <!-- iOS: icono 180x180 -->
+    <!-- iOS: icono especial 180x180 -->
     <link rel="apple-touch-icon"
-          href="https://raw.githubusercontent.com/jeison1118-cmd/fondobonilla-app/main/assets/apple-touch-icon.png">
+          href="https://raw.githubusercontent.com/jeison1118-cmd/fondobonilla-app/main/assets/apple-touch-icon.png" />
 
     <!-- iOS: abrir como app a pantalla completa -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes" />
     """,
     height=0
 )
@@ -1408,6 +1409,7 @@ elif sel == TABS[8]:
         if not movs_show.empty:
             movs_show["monto"] = movs_show["monto"].apply(format_cop)
             st.dataframe(movs_show, use_container_width=True)
+
 
 
 
