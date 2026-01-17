@@ -39,6 +39,32 @@ st.set_page_config(
 )
 
 
+# --- Fix Toolbar/header: asegurar que los clics no queden bloqueados ---
+st.markdown("""
+<style>
+/* 1) Que el header/toolbar esté por encima de cualquier overlay */
+[data-testid="stHeader"] { 
+  position: relative; 
+  z-index: 1000 !important; 
+}
+
+/* 2) Rehabilitar el Toolbar si alguna regla previa lo desactivó */
+[data-testid="stToolbar"] { 
+  visibility: visible !important; 
+  opacity: 1 !important; 
+  pointer-events: auto !important; 
+}
+
+/* 3) Evitar que cualquier overlay intercepte clics del header */
+[data-testid="stAppViewContainer"]::before,
+.fb-watermark::after {
+  pointer-events: none !important;
+}
+
+/* 4) Por si algún CSS previo ocultó el botón del menú o su área clickable */
+header [role="button"],
+[data-testid="baseButton-headerNoPadding
+
 
 import streamlit.components.v1 as components
 
@@ -1374,6 +1400,7 @@ elif sel == TABS[8]:
         if not movs_show.empty:
             movs_show["monto"] = movs_show["monto"].apply(format_cop)
             st.dataframe(movs_show, use_container_width=True)
+
 
 
 
