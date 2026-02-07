@@ -1354,6 +1354,159 @@ elif sel == TABS[7]:
             else:
                 st.info("No se seleccionaron aportes.")
 
+# ======== NUEVO: Igualación por cupo (sin inversión) + Nuevo cupo/Nuevo integrante ========
+st.markdown("### Igualación y alta rápida")
+st.caption("La igualación se calcula con *Total por cupo (sin inversión)* y se registra en la fecha indicada.")
+
+# --- 1) Calcular Total por cupo (sin inversión), consistente con el Panel de v8
+def _total_por_cupo_sin_inversion(prestamos_df, pagos_df, parametros_df, integ_df, aportes_pagos_df):
+    # Reutiliza la misma idea del panel de v8: total_fondo - pasivo_inversionista / total_cupos
+    # NOTA: Aquí no necesitamos leer 'inversionista' ni restar movimientos; usamos el saldo 'sin inversión'
+    #       equivalente a capital_inicial - desembolsos + (intereses + capital_recuperado + aportes)
+    #       y lo dividimos entre los cupos vigentes. (sin pasivo del inversionista)
+    capital_inicial = 0.0
+    row = parametros_df[parametros_df["clave"] == "capital_inicial"]
+    if not row.empty:
+        try:
+            capital_inicial = float(row.iloc[0]["valor"] or 0.0)
+        except Exception:
+            capital_inicial = 0.0
+
+    total_desembolsado = float(prestamos_df.get("monto", pd.Series(dtype=float)).sum()) if not prestamos_df.empty else 0.0
+    intereses_cobrados = float(pagos_df.get("interes_aplicado", pd.Series(dtype=float)).sum()) if not pagos_df.empty else 0.0
+    capital_recuperado = float(pagos_df.get("capital_aplicado", pd.Series(dtype=float)).sum()) if not pagos_df.empty else 0.0
+    aportes_cobrados = float(aportes_pagos_df.get("monto_pagado", pd.Series(dtype=float)).sum()) if not aportes_pagos_df.empty else 0.0
+
+    # Saldo capital en cartera
+    saldo_capital_total = float(prestamos_df.get("saldo_capital", pd.Series(dtype=float)).sum()) if not prestamos_df.empty else 0.0
+
+    # Caja neta sin considerar inversión (pasivo del inversionista)
+    caja_actual = capital_inicial - total_desembolsado + (intereses_cobrados + capital_recuperado + aportes_cobrados)
+
+    total_sin_inversion = caja_actual + saldo_capital_total
+    total_cupos = int(integ_df["cupos"].sum()) if (integ_df is not None and not integ_df.empty) else 0
+
+    return (total_sin_inversion / total_cupos) if total_cupos > 0 else 0.0
+
+total_por_cupo_actual = _total_por_cupo_sin_inversion(prestamos, pagos, parametros, integrantes, aportes_pagos)
+st.info(f"Total por cupo (sin inversión): {format_cop(total_por_cupo_actual)}")
+
+colEQ1, colEQ2 = st.columns(2, gap="large")
+
+# --- 2) NUEVO CUPO (para integrante existente)
+with colEQ1:
+    st.markdown("**Nuevo cupo (integrante existente)**")
+    if integrantes.empty:
+        st.warning("No hay integrantes. Primero crea un integrante.")
+    else:
+        nombres_opts = [row["nombre"] for _, row in integrantes.iterrows()]
+        nombre_sel = st.selectbox("Integrante", options=nombres_opts, key="eq_nombre_exist")
+        cupos_add = st.number_input("Cupos a agregar", min_value=1, value=1, step=1, key="eq_cupos_add")
+        fecha_igual = st.date_input("Fecha de igualación", value=date.today(), key="eq_fecha_exist")
+
+        if st.button("Aplicar igualación y agregar cupos", key="eq_btn_exist"):
+            try:
+                # Validaciones mínimas
+                if cupos_add <= 0:
+                    st.warning("Debes indicar al menos 1 cupo.")
+                else:
+                    integ_mask = integrantes["nombre"].str.strip().str.lower() == nombre_sel.strip().lower()
+                    if not integ_mask.any():
+                        st.error("No se encontró el integrante seleccionado.")
+                    else:
+                        iid = integrantes.loc[integ_mask, "integrante_id"].iloc[0]
+                        # Calcular igualación con la fecha indicada (periodo AAAA-MM de esa fecha)
+                        f_eq = to_date(fecha_igual) or date.today()
+                        periodo_eq = f"{f_eq.year}-{f_eq.month:02d}"
+                        monto_eq = int(round(total_por_cupo_actual * int(cupos_add)))
+
+                        # Asiento en aportes_pagos (igualación)
+                        aporte_row = {
+                            "aporte_id": str(uuid.uuid4()),
+                            "integrante_id": iid,
+                            "periodo": periodo_eq,
+                            "fecha_pago": f_eq,
+                            "cupos_pagados": int(cupos_add),
+                            "monto_pagado": monto_eq,
+                            "observaciones": "igualación por cupos nuevos",
+                            "creado_en": datetime.now(),
+                        }
+                        aportes_pagos = pd.concat([aportes_pagos, pd.DataFrame([aporte_row])], ignore_index=True)
+
+                        # Actualizar cupos del integrante
+                        cupos_act = safe_int(integrantes.loc[integ_mask, "cupos"].iloc[0], default=0)
+                        integrantes.loc[integ_mask, ["cupos", "actualizado_en"]] = [cupos_act + int(cupos_add), datetime.now()]
+
+                        # Persistir
+                        save_aportes_data(integrantes, aportes_tarifas, aportes_pagos)
+                        st.success(f"Cupos agregados (+{int(cupos_add)}). Igualación registrada: {format_cop(monto_eq)}")
+            except Exception as e:
+                st.error(f"Error aplicando igualación: {e}")
+
+# --- 3) NUEVO INTEGRANTE
+with colEQ2:
+    st.markdown("**Nuevo integrante**")
+    with st.form("form_nuevo_integrante_v8"):
+        nombre_new = st.text_input("Nombre", key="eq_nuevo_nombre")
+        ident_new = st.text_input("Identificación", key="eq_nuevo_ident")
+        cupos_new = st.number_input("Cupos iniciales", min_value=0, value=0, step=1, key="eq_nuevo_cupos")
+        fecha_igual_new = st.date_input("Fecha de igualación", value=date.today(), key="eq_nuevo_fecha")
+
+        submit_new = st.form_submit_button("Crear integrante + aplicar igualación")
+        if submit_new:
+            try:
+                # Si ya existe identificación, NO crear duplicado: sumamos cupos y asentamos igualación
+                same = None
+                if ident_new and not integrantes.empty:
+                    same_df = integrantes[integrantes["identificacion"].astype(str).str.strip() == ident_new.strip()]
+                    if not same_df.empty:
+                        same = same_df.index[0]
+
+                f_eq = to_date(fecha_igual_new) or date.today()
+                periodo_eq = f"{f_eq.year}-{f_eq.month:02d}"
+                cupos_int = int(cupos_new)
+
+                if same is not None:
+                    # Actualiza integrante existente por identificación
+                    iid = integrantes.loc[same, "integrante_id"]
+                    cupos_act = safe_int(integrantes.loc[same, "cupos"], default=0)
+                    integrantes.loc[same, ["nombre", "cupos", "actualizado_en"]] = [nombre_new or integrantes.loc[same, "nombre"],
+                                                                                     cupos_act + cupos_int,
+                                                                                     datetime.now()]
+                else:
+                    # Crea integrante nuevo
+                    iid = str(uuid.uuid4())
+                    now = datetime.now()
+                    row_new = {
+                        "integrante_id": iid,
+                        "nombre": nombre_new,
+                        "identificacion": ident_new,
+                        "cupos": cupos_int,
+                        "creado_en": now,
+                        "actualizado_en": now
+                    }
+                    integrantes = pd.concat([integrantes, pd.DataFrame([row_new])], ignore_index=True)
+
+                # Igualación solo si cupos > 0
+                if cupos_int > 0:
+                    monto_eq = int(round(total_por_cupo_actual * cupos_int))
+                    aporte_row = {
+                        "aporte_id": str(uuid.uuid4()),
+                        "integrante_id": iid,
+                        "periodo": periodo_eq,
+                        "fecha_pago": f_eq,
+                        "cupos_pagados": cupos_int,
+                        "monto_pagado": monto_eq,
+                        "observaciones": "igualación por nuevo integrante",
+                        "creado_en": datetime.now(),
+                    }
+                    aportes_pagos = pd.concat([aportes_pagos, pd.DataFrame([aporte_row])], ignore_index=True)
+
+                save_aportes_data(integrantes, aportes_tarifas, aportes_pagos)
+                st.success(f"Integrante listo. Igualación: {format_cop(int(round(total_por_cupo_actual * cupos_int)))} (por {cupos_int} cupo/s).")
+            except Exception as e:
+                st.error(f"Error creando integrante: {e}")
+
 elif sel == TABS[8]:
     st.subheader("Inversionista — Teresa Pérez")
     if not can_edit():
@@ -1418,6 +1571,7 @@ elif sel == TABS[8]:
         if not movs_show.empty:
             movs_show["monto"] = movs_show["monto"].apply(format_cop)
             st.dataframe(movs_show, use_container_width=True)
+
 
 
 
