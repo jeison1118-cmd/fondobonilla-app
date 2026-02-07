@@ -909,7 +909,7 @@ data = get_data()
     data["clientes"], data["prestamos"], data["pagos"], data["parametros"], data["integrantes"], data["aportes_tarifas"], data["aportes_pagos"]
 )
 
-TABS = ["📊 Panel", "➕ Nuevo Préstamo", "💳 Registrar Pago", "📑 Reportes", "🧮 Simulador", "🗃️ Datos / Parámetros", "♻️ Re‑amortización", "👥 Aportes", "👥 Inversionistas", "👤 Inversionista"]
+TABS = ["📊 Panel", "➕ Nuevo Préstamo", "💳 Registrar Pago", "📑 Reportes", "🧮 Simulador", "🗃️ Datos / Parámetros", "♻️ Re‑amortización", "👥 Aportes", "👥 Integrantes", "👤 Inversionista"]
 if "nav_tabs" not in st.session_state:
     st.session_state["nav_tabs"] = TABS[0]
 sel = st.radio("Navegación", options=TABS, key="nav_tabs")
