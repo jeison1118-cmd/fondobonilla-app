@@ -1365,88 +1365,86 @@ elif sel == TABS[5]:
             save_data(clientes, prestamos, pagos, parametros)
             st.success("Capital inicial guardado.")
 
-# ================================
-# ZONA ADMIN - CORRECCIONES
-# ================================
-st.divider()
-st.subheader("🧹 Correcciones (solo administrador)")
+        # ✅ ✅ ✅ AQUÍ VA TODO TU BLOQUE (INDENTADO)
+        # ================================
+        # ZONA ADMIN - CORRECCIONES
+        # ================================
 
-if not can_edit():
-    st.info(READ_ONLY_MSG)
-else:
+        st.divider()
+        st.subheader("🧹 Correcciones (solo administrador)")
 
-    # -------------------------
-    # ELIMINAR CLIENTE
-    # -------------------------
-    with st.expander("Eliminar cliente"):
-        if not clientes.empty:
+        # NO necesitas repetir esto
+        # ya estás dentro de admin
+        # pero si quieres se puede dejar
 
-            nombres = clientes["nombre"].astype(str).tolist()
-            sel_nombre = st.selectbox("Cliente", nombres, key="del_cli_sel")
+        # -------------------------
+        # ELIMINAR CLIENTE
+        # -------------------------
+        with st.expander("Eliminar cliente"):
+            if not clientes.empty:
+                nombres = clientes["nombre"].astype(str).tolist()
+                sel_nombre = st.selectbox("Cliente", nombres, key="del_cli_sel")
 
-            cliente_id = clientes[
-                clientes["nombre"] == sel_nombre
-            ]["cliente_id"].values[0]
+                cliente_id = clientes[
+                    clientes["nombre"] == sel_nombre
+                ]["cliente_id"].values[0]
 
-            confirm = st.checkbox("Confirmo eliminar cliente", key="del_cli_chk")
+                confirm = st.checkbox("Confirmo eliminar cliente", key="del_cli_chk")
 
-            if confirm and st.button("Eliminar cliente"):
-                try:
-                    clientes = eliminar_cliente(clientes, prestamos, cliente_id)
+                if confirm and st.button("Eliminar cliente"):
+                    try:
+                        clientes = eliminar_cliente(clientes, prestamos, cliente_id)
+                        save_data(clientes, prestamos, pagos, parametros)
+                        st.success("Cliente eliminado")
+                    except Exception as e:
+                        st.error(str(e))
+
+        # -------------------------
+        # ELIMINAR PRESTAMO
+        # -------------------------
+        with st.expander("Eliminar préstamo"):
+            if not prestamos.empty:
+                labels = prestamos.apply(
+                    lambda r: f"{nombre_cliente_por_id(clientes, r['cliente_id'])} - {r['display_id']}",
+                    axis=1
+                ).tolist()
+
+                sel = st.selectbox("Préstamo", labels, key="del_pre_sel")
+
+                display_id = sel.split(" - ")[1]
+
+                prestamo_id = prestamos[
+                    prestamos["display_id"] == display_id
+                ]["prestamo_id"].values[0]
+
+                confirm = st.checkbox("Confirmo eliminar préstamo", key="del_pre_chk")
+
+                if confirm and st.button("Eliminar préstamo"):
+                    prestamos, pagos = eliminar_prestamo(prestamos, pagos, prestamo_id)
                     save_data(clientes, prestamos, pagos, parametros)
-                    st.success("Cliente eliminado")
-                except Exception as e:
-                    st.error(str(e))
+                    st.success("Préstamo eliminado (incluye sus pagos)")
 
+        # -------------------------
+        # ELIMINAR PAGO
+        # -------------------------
+        with st.expander("Eliminar pago"):
+            if not pagos.empty:
+                labels = pagos.apply(
+                    lambda r: f"{r['fecha_pago']} - {r['pago_id'][:6]}",
+                    axis=1
+                ).tolist()
 
-    # -------------------------
-    # ELIMINAR PRESTAMO
-    # -------------------------
-    with st.expander("Eliminar préstamo"):
-        if not prestamos.empty:
+                sel = st.selectbox("Pago", labels, key="del_pag_sel")
 
-            labels = prestamos.apply(
-                lambda r: f"{nombre_cliente_por_id(clientes, r['cliente_id'])} - {r['display_id']}",
-                axis=1
-            ).tolist()
+                pago_id = sel.split(" - ")[1]
+                pago_id = pagos[pagos["pago_id"].str.contains(pago_id)].iloc[0]["pago_id"]
 
-            sel = st.selectbox("Préstamo", labels, key="del_pre_sel")
+                confirm = st.checkbox("Confirmo eliminar pago", key="del_pag_chk")
 
-            display_id = sel.split(" - ")[1]
-            prestamo_id = prestamos[
-                prestamos["display_id"] == display_id
-            ]["prestamo_id"].values[0]
-
-            confirm = st.checkbox("Confirmo eliminar préstamo", key="del_pre_chk")
-
-            if confirm and st.button("Eliminar préstamo"):
-                prestamos, pagos = eliminar_prestamo(prestamos, pagos, prestamo_id)
-                save_data(clientes, prestamos, pagos, parametros)
-                st.success("Préstamo eliminado (incluye sus pagos)")
-
-
-    # -------------------------
-    # ELIMINAR PAGO
-    # -------------------------
-    with st.expander("Eliminar pago"):
-        if not pagos.empty:
-
-            labels = pagos.apply(
-                lambda r: f"{r['fecha_pago']} - {r['pago_id'][:6]}",
-                axis=1
-            ).tolist()
-
-            sel = st.selectbox("Pago", labels, key="del_pag_sel")
-
-            pago_id = sel.split(" - ")[1]
-            pago_id = pagos[pagos["pago_id"].str.contains(pago_id)].iloc[0]["pago_id"]
-
-            confirm = st.checkbox("Confirmo eliminar pago", key="del_pag_chk")
-
-            if confirm and st.button("Eliminar pago"):
-                pagos, prestamos = eliminar_pago(pagos, prestamos, pago_id)
-                save_data(clientes, prestamos, pagos, parametros)
-                st.success("Pago eliminado y saldo recalculado")
+                if confirm and st.button("Eliminar pago"):
+                    pagos, prestamos = eliminar_pago(pagos, prestamos, pago_id)
+                    save_data(clientes, prestamos, pagos, parametros)
+                    st.success("Pago eliminado y saldo recalculado")
                 
 elif sel == TABS[6]:
     st.subheader("Re‑amortización de préstamo (actualiza plan_inicio)")
