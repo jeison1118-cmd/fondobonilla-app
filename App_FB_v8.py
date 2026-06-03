@@ -1404,7 +1404,7 @@ elif sel == TABS[5]:
         if not row_int.empty:
              try:
                 val_int = float(row_int.iloc[0]["valor"])
-            except:
+             except:
                 val_int = 0.0
 
         nuevo_int = st.number_input(
