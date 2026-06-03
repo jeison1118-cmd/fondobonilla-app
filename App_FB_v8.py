@@ -721,6 +721,39 @@ def eliminar_pago(pagos_df, prestamos_df, pago_id):
 
     return pagos_df, prestamos_df
 
+# ================================
+# INTERESES DISPONIBLES (UTILIDADES)
+# ================================
+
+def calcular_intereses_disponibles(pagos_df, parametros_df, aportes_pagos_df=None):
+
+    # intereses generados en el sistema
+    intereses_sistema = float(
+        pagos_df.get("interes_aplicado", pd.Series(dtype=float)).sum()
+    ) if not pagos_df.empty else 0.0
+
+    # intereses iniciales (antes del sistema)
+    intereses_iniciales = 0.0
+    if not parametros_df.empty:
+        row = parametros_df[parametros_df["clave"] == "intereses_iniciales"]
+        if not row.empty:
+            try:
+                intereses_iniciales = float(row.iloc[0]["valor"])
+            except:
+                intereses_iniciales = 0.0
+
+    # retiros ya realizados (negativos)
+    retiros = 0.0
+    if aportes_pagos_df is not None and not aportes_pagos_df.empty:
+        retiros = float(
+            aportes_pagos_df[
+                aportes_pagos_df["observaciones"].astype(str).str.contains(
+                    "retiro_utilidad", case=False, na=False
+                )
+            ]["monto_pagado"].sum()
+        )
+
+    return intereses_sistema + intereses_iniciales + retiros
 
 # --- Integrantes + Ajustes (igualación/desigualación) ---
 
@@ -1365,6 +1398,47 @@ elif sel == TABS[5]:
             save_data(clientes, prestamos, pagos, parametros)
             st.success("Capital inicial guardado.")
 
+        # ================================
+# AJUSTE INICIAL DE INTERESES
+# ================================
+st.markdown("### Ajuste inicial de intereses")
+
+row_int = parametros[parametros["clave"] == "intereses_iniciales"]
+
+val_int = 0.0
+if not row_int.empty:
+    try:
+        val_int = float(row_int.iloc[0]["valor"])
+    except:
+        val_int = 0.0
+
+nuevo_int = st.number_input(
+    "Intereses acumulados iniciales (COP)",
+    min_value=0.0,
+    value=val_int,
+    step=50000.0,
+    key="params_intereses_ini"
+)
+
+if st.button("💾 Guardar intereses iniciales"):
+
+    if row_int.empty:
+        parametros = pd.concat([
+            parametros,
+            pd.DataFrame([{
+                "clave": "intereses_iniciales",
+                "valor": int(nuevo_int)
+            }])
+        ], ignore_index=True)
+    else:
+        parametros.loc[
+            parametros["clave"] == "intereses_iniciales",
+            "valor"
+        ] = int(nuevo_int)
+
+    save_data(clientes, prestamos, pagos, parametros)
+    st.success("Intereses iniciales guardados ✅")
+
         # ✅ ✅ ✅ AQUÍ VA TODO TU BLOQUE (INDENTADO)
         # ================================
         # ZONA ADMIN - CORRECCIONES
@@ -1577,6 +1651,73 @@ elif sel == TABS[7]:
                 st.success(f"Aportes registrados: {len(nuevos_aportes)}")
             else:
                 st.info("No se seleccionaron aportes.")
+
+
+# ================================
+# RETIRO DE UTILIDADES
+# ================================
+st.divider()
+st.subheader("💰 Retiro de utilidades")
+
+intereses_disp = calcular_intereses_disponibles(pagos, parametros, aportes_pagos)
+
+st.metric("Intereses disponibles", format_cop(intereses_disp))
+
+retiro = st.number_input(
+    "Monto a retirar",
+    min_value=0,
+    max_value=int(intereses_disp) if intereses_disp > 0 else 0,
+    value=0,
+    step=50000,
+    key="retiro_utilidades"
+)
+
+if st.button("Retirar utilidades"):
+
+    if retiro <= 0:
+        st.warning("Ingresa un valor válido")
+
+    elif retiro > intereses_disp:
+        st.error("No puedes retirar más de lo disponible")
+
+    else:
+        hoy = date.today()
+
+        movimientos = []
+
+        total_cupos = int(integrantes["cupos"].sum()) if not integrantes.empty else 0
+
+        if total_cupos == 0:
+            st.error("No hay cupos registrados")
+
+        else:
+            valor_por_cupo = retiro / total_cupos
+
+            for _, row in integrantes.iterrows():
+                cupos = int(row["cupos"] or 0)
+
+                if cupos > 0:
+                    monto_ind = int(round(valor_por_cupo * cupos))
+
+                    movimientos.append({
+                        "aporte_id": str(uuid.uuid4()),
+                        "integrante_id": row["integrante_id"],
+                        "periodo": f"{hoy.year}-{hoy.month:02d}",
+                        "fecha_pago": hoy,
+                        "cupos_pagados": 0,
+                        "monto_pagado": -monto_ind,
+                        "observaciones": "retiro_utilidad",
+                        "creado_en": datetime.now()
+                    })
+
+            aportes_pagos = pd.concat(
+                [aportes_pagos, pd.DataFrame(movimientos)],
+                ignore_index=True
+            )
+
+            save_aportes_data(integrantes, aportes_tarifas, aportes_pagos)
+
+            st.success(f"✅ Retiro realizado: {format_cop(retiro)}")
                 
                 
 
