@@ -1654,7 +1654,7 @@ elif sel == TABS[7]:
 st.divider()
 st.subheader("💰 Retiro de utilidades")
 
-intereses_disp = calcular_intereses_disponibles(pagos, parametros, aportes_pagos)
+intereses_disp = calcular_intereses_disponibles(parametros, aportes_pagos)
 
 st.metric("Intereses disponibles", format_cop(intereses_disp))
 
