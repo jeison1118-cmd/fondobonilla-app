@@ -725,24 +725,19 @@ def eliminar_pago(pagos_df, prestamos_df, pago_id):
 # INTERESES DISPONIBLES (UTILIDADES)
 # ================================
 
-def calcular_intereses_disponibles(pagos_df, parametros_df, aportes_pagos_df=None):
+def calcular_intereses_disponibles(parametros_df, aportes_pagos_df=None):
 
-    # intereses generados en el sistema
-    intereses_sistema = float(
-        pagos_df.get("interes_aplicado", pd.Series(dtype=float)).sum()
-    ) if not pagos_df.empty else 0.0
-
-    # intereses iniciales (antes del sistema)
-    intereses_iniciales = 0.0
+    # 1. valor REAL definido manualmente
+    intereses_base = 0.0
     if not parametros_df.empty:
-        row = parametros_df[parametros_df["clave"] == "intereses_iniciales"]
+        row = parametros_df[parametros_df["clave"] == "intereses_reales_actuales"]
         if not row.empty:
             try:
-                intereses_iniciales = float(row.iloc[0]["valor"])
+                intereses_base = float(row.iloc[0]["valor"])
             except:
-                intereses_iniciales = 0.0
+                intereses_base = 0.0
 
-    # retiros ya realizados (negativos)
+    # 2. retiros realizados
     retiros = 0.0
     if aportes_pagos_df is not None and not aportes_pagos_df.empty:
         retiros = float(
@@ -753,9 +748,8 @@ def calcular_intereses_disponibles(pagos_df, parametros_df, aportes_pagos_df=Non
             ]["monto_pagado"].sum()
         )
 
-    return intereses_sistema + intereses_iniciales + retiros
-
-# --- Integrantes + Ajustes (igualación/desigualación) ---
+    # ✅ RESULTADO FINAL
+    return intereses_base + retiros
 
 def crear_integrante(integrantes_df: pd.DataFrame, nombre: str, identificacion: str, cupos_iniciales: int):
     """Crea un integrante nuevo con cupos iniciales (no guarda)."""
@@ -1401,45 +1395,46 @@ elif sel == TABS[5]:
         # ================================
         # AJUSTE INICIAL DE INTERESES
         # ================================
-        st.markdown("### Ajuste inicial de intereses")
 
-        row_int = parametros[parametros["clave"] == "intereses_iniciales"]
+        st.markdown("### Intereses reales del fondo")
+
+        row_int = parametros[parametros["clave"] == "intereses_reales_actuales"]
 
         val_int = 0.0
         if not row_int.empty:
-            try:
+             try:
                 val_int = float(row_int.iloc[0]["valor"])
             except:
                 val_int = 0.0
 
         nuevo_int = st.number_input(
-            "Intereses acumulados iniciales (COP)",
+            "Total real de intereses acumulados (COP)",
             min_value=0.0,
             value=val_int,
             step=50000.0,
-            key="params_intereses_ini"
+            key="params_intereses_real_final"
         )
 
-        if st.button("💾 Guardar intereses iniciales"):
+        if st.button("Guardar valor real de intereses"):
 
-            if row_int.empty:
+             if row_int.empty:
                 parametros = pd.concat([
                     parametros,
                     pd.DataFrame([{
-                        "clave": "intereses_iniciales",
+                        "clave": "intereses_reales_actuales",
                         "valor": int(nuevo_int)
                     }])
                 ], ignore_index=True)
             else:
                 parametros.loc[
-                    parametros["clave"] == "intereses_iniciales",
+                    parametros["clave"] == "intereses_reales_actuales",
                     "valor"
                 ] = int(nuevo_int)
 
             save_data(clientes, prestamos, pagos, parametros)
-            st.success("Intereses iniciales guardados ✅")
-
-        # ✅ ✅ ✅ AQUÍ VA TODO TU BLOQUE (INDENTADO)
+            st.success("Valor real actualizado ✅")
+    
+    # ✅ ✅ ✅ AQUÍ VA TODO TU BLOQUE (INDENTADO)
         # ================================
         # ZONA ADMIN - CORRECCIONES
         # ================================
