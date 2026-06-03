@@ -1399,45 +1399,45 @@ elif sel == TABS[5]:
             st.success("Capital inicial guardado.")
 
         # ================================
-# AJUSTE INICIAL DE INTERESES
-# ================================
-st.markdown("### Ajuste inicial de intereses")
+        # AJUSTE INICIAL DE INTERESES
+        # ================================
+        st.markdown("### Ajuste inicial de intereses")
 
-row_int = parametros[parametros["clave"] == "intereses_iniciales"]
+        row_int = parametros[parametros["clave"] == "intereses_iniciales"]
 
-val_int = 0.0
-if not row_int.empty:
-    try:
-        val_int = float(row_int.iloc[0]["valor"])
-    except:
         val_int = 0.0
+        if not row_int.empty:
+            try:
+                val_int = float(row_int.iloc[0]["valor"])
+            except:
+                val_int = 0.0
 
-nuevo_int = st.number_input(
-    "Intereses acumulados iniciales (COP)",
-    min_value=0.0,
-    value=val_int,
-    step=50000.0,
-    key="params_intereses_ini"
-)
+        nuevo_int = st.number_input(
+            "Intereses acumulados iniciales (COP)",
+            min_value=0.0,
+            value=val_int,
+            step=50000.0,
+            key="params_intereses_ini"
+        )
 
-if st.button("💾 Guardar intereses iniciales"):
+        if st.button("💾 Guardar intereses iniciales"):
 
-    if row_int.empty:
-        parametros = pd.concat([
-            parametros,
-            pd.DataFrame([{
-                "clave": "intereses_iniciales",
-                "valor": int(nuevo_int)
-            }])
-        ], ignore_index=True)
-    else:
-        parametros.loc[
-            parametros["clave"] == "intereses_iniciales",
-            "valor"
-        ] = int(nuevo_int)
+            if row_int.empty:
+                parametros = pd.concat([
+                    parametros,
+                    pd.DataFrame([{
+                        "clave": "intereses_iniciales",
+                        "valor": int(nuevo_int)
+                    }])
+                ], ignore_index=True)
+            else:
+                parametros.loc[
+                    parametros["clave"] == "intereses_iniciales",
+                    "valor"
+                ] = int(nuevo_int)
 
-    save_data(clientes, prestamos, pagos, parametros)
-    st.success("Intereses iniciales guardados ✅")
+            save_data(clientes, prestamos, pagos, parametros)
+            st.success("Intereses iniciales guardados ✅")
 
         # ✅ ✅ ✅ AQUÍ VA TODO TU BLOQUE (INDENTADO)
         # ================================
