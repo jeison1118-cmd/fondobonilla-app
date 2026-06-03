@@ -1425,7 +1425,7 @@ elif sel == TABS[5]:
                         "valor": int(nuevo_int)
                     }])
                 ], ignore_index=True)
-            else:
+             else:
                 parametros.loc[
                     parametros["clave"] == "intereses_reales_actuales",
                     "valor"
