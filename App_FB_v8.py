@@ -374,7 +374,8 @@ def parse_percent(text: str) -> float:
 
 def percent_str(decimal_rate: float) -> str:
     try:
-        return f"{round(decimal_rate * 100)}%"
+        v = decimal_rate * 100
+        return f"{v:.2f}".rstrip("0").rstrip(".") + "%"
     except:
         return "0%"
 
