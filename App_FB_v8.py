@@ -1589,132 +1589,88 @@ elif sel == TABS[6]:
 
 elif sel == TABS[7]:
     st.subheader("Aportes de integrantes (registro por período)")
+
     if not can_edit():
         st.info(READ_ONLY_MSG)
     else:
-        integ_edit = normalize_datetime_cols(integrantes.copy(), ["creado_en","actualizado_en"], to_string=True)
-        st.dataframe(integ_edit, use_container_width=True)
-
-        with st.form("form_integrantes_edit"):
-            nombre_edit = st.text_input("Nombre del integrante a actualizar", key="ap_integ_edit_nombre")
-            cupos_nuevo = st.number_input("Nuevo número de cupos", min_value=0, value=0, step=1, key="ap_integ_edit_cupos")
-            submitted_edit = st.form_submit_button("Actualizar cupos")
-        if submitted_edit:
-            mask = integrantes["nombre"].str.lower() == nombre_edit.strip().lower()
-            if mask.any():
-                integrantes.loc[mask, ["cupos","actualizado_en"]] = [int(cupos_nuevo), datetime.now()]
-                save_aportes_data(integrantes, aportes_tarifas, aportes_pagos)
-                st.success("Cupos actualizados.")
-            else:
-                st.warning("No se encontró ese nombre.")
-
-        anio_actual = date.today().year
-        row_tar = aportes_tarifas[aportes_tarifas["anio"] == anio_actual]
-        val_tarifa = 70000 if row_tar.empty else int(row_tar.iloc[0]["valor_por_cupo"])
-        nueva_tarifa = st.number_input(f"Tarifa por cupo ({anio_actual})", min_value=0, value=val_tarifa, step=5000, key="ap_tarifa_anio")
-        if st.button("Guardar tarifa", key="ap_tarifa_save"):
-            if row_tar.empty:
-                aportes_tarifas = pd.concat([aportes_tarifas, pd.DataFrame([{"anio": anio_actual, "valor_por_cupo": int(nueva_tarifa)}])], ignore_index=True)
-            else:
-                aportes_tarifas.loc[aportes_tarifas["anio"] == anio_actual, "valor_por_cupo"] = int(nueva_tarifa)
-            save_aportes_data(integrantes, aportes_tarifas, aportes_pagos)
-            st.success("Tarifa guardada.")
-
-        st.markdown("### Registrar aportes del período")
-        st.caption("Período (AAAA‑MM) = mes contable del aporte. Fecha de cobro = día real recibido.")
-        periodo = st.text_input("Período (AAAA‑MM)", value=f"{anio_actual}-{date.today().month:02d}", key="ap_periodo")
-        fecha_pago_ap = st.date_input("Fecha de cobro", value=date.today(), key="ap_fecha_cobro")
-
-        nuevos_aportes = []
-        for i, row in integrantes.iterrows():
-            cupos_pag = st.number_input(
-                f"{row['nombre']} — cupos vigentes: {safe_int(row['cupos'], default=0)}",
-                min_value=0,
-                max_value=safe_int(row["cupos"], default=0),
-                value=0,
-                step=1,
-                key=f"ap_{row['integrante_id']}",
-            )
-            if cupos_pag > 0:
-                monto = int(cupos_pag * nueva_tarifa)
-                nuevos_aportes.append({"aporte_id": str(uuid.uuid4()), "integrante_id": row["integrante_id"], "periodo": periodo, "fecha_pago": fecha_pago_ap, "cupos_pagados": int(cupos_pag), "monto_pagado": monto, "observaciones": "", "creado_en": datetime.now()})
-
+        # ✅ TODO tu código existente
+        ...
         if st.button("💾 Registrar aportes del período", key="ap_guardar_periodo"):
             if nuevos_aportes:
-                aportes_pagos = pd.concat([aportes_pagos, pd.DataFrame(nuevos_aportes)], ignore_index=True)
+                aportes_pagos = pd.concat(
+                    [aportes_pagos, pd.DataFrame(nuevos_aportes)],
+                    ignore_index=True
+                )
                 save_aportes_data(integrantes, aportes_tarifas, aportes_pagos)
                 st.success(f"Aportes registrados: {len(nuevos_aportes)}")
             else:
                 st.info("No se seleccionaron aportes.")
 
+        # ✅ ✅ ✅ AQUÍ ADENTRO VA EL RETIRO
+        # ================================
+        # RETIRO DE UTILIDADES
+        # ================================
+        st.divider()
+        st.subheader("💰 Retiro de utilidades")
 
-# ================================
-# RETIRO DE UTILIDADES
-# ================================
-st.divider()
-st.subheader("💰 Retiro de utilidades")
+        intereses_disp = calcular_intereses_disponibles(parametros, aportes_pagos)
 
-intereses_disp = calcular_intereses_disponibles(parametros, aportes_pagos)
+        st.metric("Intereses disponibles", format_cop(intereses_disp))
 
-st.metric("Intereses disponibles", format_cop(intereses_disp))
+        retiro = st.number_input(
+            "Monto a retirar",
+            min_value=0,
+            max_value=int(intereses_disp) if intereses_disp > 0 else 0,
+            value=0,
+            step=50000,
+            key="retiro_utilidades"
+        )
 
-retiro = st.number_input(
-    "Monto a retirar",
-    min_value=0,
-    max_value=int(intereses_disp) if intereses_disp > 0 else 0,
-    value=0,
-    step=50000,
-    key="retiro_utilidades"
-)
+        if st.button("Retirar utilidades"):
 
-if st.button("Retirar utilidades"):
+            if retiro <= 0:
+                st.warning("Ingresa un valor válido")
 
-    if retiro <= 0:
-        st.warning("Ingresa un valor válido")
+            elif retiro > intereses_disp:
+                st.error("No puedes retirar más de lo disponible")
 
-    elif retiro > intereses_disp:
-        st.error("No puedes retirar más de lo disponible")
+            else:
+                hoy = date.today()
+                movimientos = []
 
-    else:
-        hoy = date.today()
+                total_cupos = int(integrantes["cupos"].sum()) if not integrantes.empty else 0
 
-        movimientos = []
+                if total_cupos == 0:
+                    st.error("No hay cupos registrados")
+                else:
+                    valor_por_cupo = retiro / total_cupos
 
-        total_cupos = int(integrantes["cupos"].sum()) if not integrantes.empty else 0
+                    for _, row in integrantes.iterrows():
+                        cupos = int(row["cupos"] or 0)
 
-        if total_cupos == 0:
-            st.error("No hay cupos registrados")
+                        if cupos > 0:
+                            monto_ind = int(round(valor_por_cupo * cupos))
 
-        else:
-            valor_por_cupo = retiro / total_cupos
+                            movimientos.append({
+                                "aporte_id": str(uuid.uuid4()),
+                                "integrante_id": row["integrante_id"],
+                                "periodo": f"{hoy.year}-{hoy.month:02d}",
+                                "fecha_pago": hoy,
+                                "cupos_pagados": 0,
+                                "monto_pagado": -monto_ind,
+                                "observaciones": "retiro_utilidad",
+                                "creado_en": datetime.now()
+                            })
 
-            for _, row in integrantes.iterrows():
-                cupos = int(row["cupos"] or 0)
+                    aportes_pagos = pd.concat(
+                        [aportes_pagos, pd.DataFrame(movimientos)],
+                        ignore_index=True
+                    )
 
-                if cupos > 0:
-                    monto_ind = int(round(valor_por_cupo * cupos))
+                    save_aportes_data(integrantes, aportes_tarifas, aportes_pagos)
 
-                    movimientos.append({
-                        "aporte_id": str(uuid.uuid4()),
-                        "integrante_id": row["integrante_id"],
-                        "periodo": f"{hoy.year}-{hoy.month:02d}",
-                        "fecha_pago": hoy,
-                        "cupos_pagados": 0,
-                        "monto_pagado": -monto_ind,
-                        "observaciones": "retiro_utilidad",
-                        "creado_en": datetime.now()
-                    })
+                    st.success(f"✅ Retiro realizado: {format_cop(retiro)}")
 
-            aportes_pagos = pd.concat(
-                [aportes_pagos, pd.DataFrame(movimientos)],
-                ignore_index=True
-            )
-
-            save_aportes_data(integrantes, aportes_tarifas, aportes_pagos)
-
-            st.success(f"✅ Retiro realizado: {format_cop(retiro)}")
-                
-                
 
 elif sel == TABS[8]:
     st.subheader("Ajustes de integrantes: igualación y retiros")
