@@ -725,19 +725,46 @@ def eliminar_pago(pagos_df, prestamos_df, pago_id):
 # INTERESES DISPONIBLES (UTILIDADES)
 # ================================
 
-def calcular_intereses_disponibles(parametros_df, aportes_pagos_df=None):
+def calcular_intereses_disponibles(pagos_df, parametros_df, aportes_pagos_df=None):
 
-    # 1. valor REAL definido manualmente
+    # ============================
+    # 1. BASE REAL
+    # ============================
     intereses_base = 0.0
+    fecha_inicio = None
+
     if not parametros_df.empty:
-        row = parametros_df[parametros_df["clave"] == "intereses_reales_actuales"]
-        if not row.empty:
+        row_base = parametros_df[parametros_df["clave"] == "intereses_reales_actuales"]
+        if not row_base.empty:
             try:
-                intereses_base = float(row.iloc[0]["valor"])
+                intereses_base = float(row_base.iloc[0]["valor"])
             except:
                 intereses_base = 0.0
 
-    # 2. retiros realizados
+        row_fecha = parametros_df[parametros_df["clave"] == "fecha_inicio_intereses"]
+        if not row_fecha.empty:
+            try:
+                fecha_inicio = pd.to_datetime(row_fecha.iloc[0]["valor"]).date()
+            except:
+                fecha_inicio = None
+
+    # ============================
+    # 2. INTERESES NUEVOS
+    # ============================
+    intereses_nuevos = 0.0
+
+    if fecha_inicio and not pagos_df.empty:
+        pagos_df["fecha_pago"] = pd.to_datetime(pagos_df["fecha_pago"]).dt.date
+
+        mask = pagos_df["fecha_pago"] >= fecha_inicio
+
+        intereses_nuevos = float(
+            pagos_df.loc[mask, "interes_aplicado"].sum()
+        )
+
+    # ============================
+    # 3. RETIROS
+    # ============================
     retiros = 0.0
     if aportes_pagos_df is not None and not aportes_pagos_df.empty:
         retiros = float(
@@ -749,7 +776,7 @@ def calcular_intereses_disponibles(parametros_df, aportes_pagos_df=None):
         )
 
     # ✅ RESULTADO FINAL
-    return intereses_base + retiros
+    return intereses_base + intereses_nuevos + retiros
 
 def crear_integrante(integrantes_df: pd.DataFrame, nombre: str, identificacion: str, cupos_iniciales: int):
     """Crea un integrante nuevo con cupos iniciales (no guarda)."""
@@ -1433,8 +1460,44 @@ elif sel == TABS[5]:
 
              save_data(clientes, prestamos, pagos, parametros)
              st.success("Valor real actualizado ✅")
+
+        st.markdown("### Fecha de inicio para nuevos intereses")
+
+        row_fecha = parametros[parametros["clave"] == "fecha_inicio_intereses"]
+
+        val_fecha = date.today()
+        if not row_fecha.empty:
+            try:
+                val_fecha = pd.to_datetime(row_fecha.iloc[0]["valor"]).date()
+            except:
+                pass
+
+        nueva_fecha = st.date_input(
+            "Contar intereses desde esta fecha",
+            value=val_fecha,
+            key="params_fecha_intereses"
+        )
+
+        if st.button("Guardar fecha de corte intereses"):
+
+            if row_fecha.empty:
+                parametros = pd.concat([
+                    parametros,
+                    pd.DataFrame([{
+                        "clave": "fecha_inicio_intereses",
+                        "valor": str(nueva_fecha)
+                    }])
+                ], ignore_index=True)
+            else:
+                parametros.loc[
+                    parametros["clave"] == "fecha_inicio_intereses",
+                    "valor"
+                ] = str(nueva_fecha)
+
+            save_data(clientes, prestamos, pagos, parametros)
+            st.success("Fecha de corte guardada ✅")
     
-    # ✅ ✅ ✅ AQUÍ VA TODO TU BLOQUE (INDENTADO)
+        
         # ================================
         # ZONA ADMIN - CORRECCIONES
         # ================================
@@ -1663,7 +1726,7 @@ elif sel == TABS[7]:
         st.divider()
         st.subheader("💰 Retiro de utilidades")
 
-        intereses_disp = calcular_intereses_disponibles(parametros, aportes_pagos)
+        intereses_disp = calcular_intereses_disponibles(pagos, parametros, aportes_pagos)
 
         st.metric("Intereses disponibles", format_cop(intereses_disp))
 
