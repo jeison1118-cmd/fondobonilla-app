@@ -1459,50 +1459,47 @@ elif sel == TABS[5]:
 
             save_data(clientes, prestamos, pagos, parametros)
             st.success("Valor real actualizado ✅")
-            st.stop()
+   
+        # ================================
+        # FECHA DE CORTE DE INTERESES
+        # ================================
+        st.divider()
 
-            
-            st.divider()   # 👈 AGREGAR ESTO
+        st.subheader("📅 Fecha de inicio para nuevos intereses")
 
-            # ================================
-            # FECHA DE CORTE DE INTERESES
-            # ================================
-            st.subheader("📅 Fecha de inicio para nuevos intereses")
-            row_fecha = parametros[parametros["clave"] == "fecha_inicio_intereses"]
+        row_fecha = parametros[parametros["clave"] == "fecha_inicio_intereses"]
 
-            val_fecha = date.today()
-            if not row_fecha.empty:
-                try:
-                    val_fecha = pd.to_datetime(row_fecha.iloc[0]["valor"]).date()
-                except:
-                    pass
+        val_fecha = date.today()
+        if not row_fecha.empty:
+            try:
+                val_fecha = pd.to_datetime(row_fecha.iloc[0]["valor"]).date()
+            except:
+                pass
 
-            nueva_fecha = st.date_input(
-                "Contar intereses desde esta fecha",
-                value=val_fecha,
-                key="params_fecha_intereses"
-            )
+        nueva_fecha = st.date_input(
+            "Contar intereses desde esta fecha",
+            value=val_fecha,
+            key="params_fecha_intereses"
+        )
 
-            if st.button("Guardar fecha de corte intereses"):
+        if st.button("Guardar fecha de corte intereses"):
 
-                if row_fecha.empty:
-                    parametros = pd.concat([
-                        parametros,
-                        pd.DataFrame([{
-                            "clave": "fecha_inicio_intereses",
-                            "valor": str(nueva_fecha)
-                        }])
-                    ], ignore_index=True)
-                else:
-                    parametros.loc[
-                        parametros["clave"] == "fecha_inicio_intereses",
-                        "valor"
-                    ] = str(nueva_fecha)
+            if row_fecha.empty:
+                 parametros = pd.concat([
+                    parametros,
+                    pd.DataFrame([{
+                        "clave": "fecha_inicio_intereses",
+                        "valor": str(nueva_fecha)
+                    }])
+                ], ignore_index=True)
+            else:
+                parametros.loc[
+                    parametros["clave"] == "fecha_inicio_intereses",
+                    "valor"
+                ] = str(nueva_fecha)
 
-                save_data(clientes, prestamos, pagos, parametros)
-                st.success("Fecha de corte guardada ✅")
-    
-        
+            save_data(clientes, prestamos, pagos, parametros)
+            st.success("Fecha de corte guardada ✅")
         # ================================
         # ZONA ADMIN - CORRECCIONES
         # ================================
