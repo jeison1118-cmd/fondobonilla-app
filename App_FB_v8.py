@@ -1431,8 +1431,8 @@ elif sel == TABS[5]:
                     "valor"
                 ] = int(nuevo_int)
 
-            save_data(clientes, prestamos, pagos, parametros)
-            st.success("Valor real actualizado ✅")
+             save_data(clientes, prestamos, pagos, parametros)
+             st.success("Valor real actualizado ✅")
     
     # ✅ ✅ ✅ AQUÍ VA TODO TU BLOQUE (INDENTADO)
         # ================================
