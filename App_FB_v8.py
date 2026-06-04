@@ -1593,8 +1593,47 @@ elif sel == TABS[7]:
     if not can_edit():
         st.info(READ_ONLY_MSG)
     else:
-        # ✅ TODO tu código existente
-        ...
+        st.markdown("### Registrar aportes del período")
+        st.caption("Período (AAAA‑MM) = mes contable del aporte. Fecha de cobro = día real recibido.")
+
+        periodo = st.text_input(
+            "Período (AAAA‑MM)",
+            value=f"{date.today().year}-{date.today().month:02d}",
+            key="ap_periodo"
+        )
+
+        fecha_pago_ap = st.date_input(
+            "Fecha de cobro",
+            value=date.today(),
+            key="ap_fecha_cobro"
+        )
+
+        # ✅ ESTA VARIABLE ES LA CLAVE (EL ERROR VENÍA DE AQUÍ)
+        nuevos_aportes = []
+
+        for i, row in integrantes.iterrows():
+            cupos_pag = st.number_input(
+                f"{row['nombre']} — cupos vigentes: {safe_int(row['cupos'], default=0)}",
+                min_value=0,
+                max_value=safe_int(row["cupos"], default=0),
+                value=0,
+                step=1,
+                key=f"ap_{row['integrante_id']}"
+            )
+
+            if cupos_pag > 0:
+                monto = int(cupos_pag * nueva_tarifa)
+                nuevos_aportes.append({
+                    "aporte_id": str(uuid.uuid4()),
+                    "integrante_id": row["integrante_id"],
+                    "periodo": periodo,
+                    "fecha_pago": fecha_pago_ap,
+                    "cupos_pagados": int(cupos_pag),
+                    "monto_pagado": monto,
+                    "observaciones": "",
+                    "creado_en": datetime.now()
+                })
+
         if st.button("💾 Registrar aportes del período", key="ap_guardar_periodo"):
             if nuevos_aportes:
                 aportes_pagos = pd.concat(
@@ -1605,6 +1644,17 @@ elif sel == TABS[7]:
                 st.success(f"Aportes registrados: {len(nuevos_aportes)}")
             else:
                 st.info("No se seleccionaron aportes.")
+        
+                if st.button("💾 Registrar aportes del período", key="ap_guardar_periodo"):
+                    if nuevos_aportes:
+                        aportes_pagos = pd.concat(
+                            [aportes_pagos, pd.DataFrame(nuevos_aportes)],
+                            ignore_index=True
+                        )
+                        save_aportes_data(integrantes, aportes_tarifas, aportes_pagos)
+                        st.success(f"Aportes registrados: {len(nuevos_aportes)}")
+                    else:
+                        st.info("No se seleccionaron aportes.")
 
         # ✅ ✅ ✅ AQUÍ ADENTRO VA EL RETIRO
         # ================================
