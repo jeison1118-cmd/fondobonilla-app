@@ -1461,12 +1461,12 @@ elif sel == TABS[5]:
              save_data(clientes, prestamos, pagos, parametros)
              st.success("Valor real actualizado ✅")
             
-            st.divider()   # 👈 AGREGAR ESTO
+             st.divider()   # 👈 AGREGAR ESTO
 
             # ================================
             # FECHA DE CORTE DE INTERESES
             # ================================
-            st.subheader("📅 Fecha de inicio para nuevos intereses")
+             st.subheader("📅 Fecha de inicio para nuevos intereses")
             row_fecha = parametros[parametros["clave"] == "fecha_inicio_intereses"]
 
             val_fecha = date.today()
