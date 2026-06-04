@@ -1444,7 +1444,7 @@ elif sel == TABS[5]:
 
         if st.button("Guardar valor real de intereses"):
 
-             if row_int.empty:
+            if row_int.empty:
                 parametros = pd.concat([
                     parametros,
                     pd.DataFrame([{
@@ -1452,21 +1452,21 @@ elif sel == TABS[5]:
                         "valor": int(nuevo_int)
                     }])
                 ], ignore_index=True)
-             else:
+            else:
                 parametros.loc[
                     parametros["clave"] == "intereses_reales_actuales",
                     "valor"
                 ] = int(nuevo_int)
 
-             save_data(clientes, prestamos, pagos, parametros)
-             st.success("Valor real actualizado ✅")
+            save_data(clientes, prestamos, pagos, parametros)
+            st.success("Valor real actualizado ✅")
             
-             st.divider()   # 👈 AGREGAR ESTO
+            st.divider()   # 👈 AGREGAR ESTO
 
             # ================================
             # FECHA DE CORTE DE INTERESES
             # ================================
-             st.subheader("📅 Fecha de inicio para nuevos intereses")
+            st.subheader("📅 Fecha de inicio para nuevos intereses")
             row_fecha = parametros[parametros["clave"] == "fecha_inicio_intereses"]
 
             val_fecha = date.today()
