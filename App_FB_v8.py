@@ -1460,9 +1460,13 @@ elif sel == TABS[5]:
 
              save_data(clientes, prestamos, pagos, parametros)
              st.success("Valor real actualizado ✅")
+            
+             st.divider()   # 👈 AGREGAR ESTO
 
-             st.markdown("### Fecha de inicio para nuevos intereses")
-
+            # ================================
+            # FECHA DE CORTE DE INTERESES
+            # ================================
+             st.subheader("📅 Fecha de inicio para nuevos intereses")
              row_fecha = parametros[parametros["clave"] == "fecha_inicio_intereses"]
 
              val_fecha = date.today()
@@ -1727,6 +1731,7 @@ elif sel == TABS[7]:
         st.subheader("💰 Retiro de utilidades")
 
         intereses_disp = calcular_intereses_disponibles(pagos, parametros, aportes_pagos)
+        st.caption("Solo se sumarán intereses generados desde esta fecha en adelante.")
 
         st.metric("Intereses disponibles", format_cop(intereses_disp))
 
