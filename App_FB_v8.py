@@ -1423,8 +1423,7 @@ elif sel == TABS[5]:
         # AJUSTE INICIAL DE INTERESES
         # ================================
 
-        st.markdown("### Intereses reales del fondo")
-
+        st.subheader("💰 Intereses reales del fondo")
         row_int = parametros[parametros["clave"] == "intereses_reales_actuales"]
 
         val_int = 0.0
@@ -1460,6 +1459,8 @@ elif sel == TABS[5]:
 
             save_data(clientes, prestamos, pagos, parametros)
             st.success("Valor real actualizado ✅")
+            st.stop()
+
             
             st.divider()   # 👈 AGREGAR ESTO
 
