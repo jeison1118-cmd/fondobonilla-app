@@ -1459,7 +1459,7 @@ elif sel == TABS[5]:
                 ] = int(nuevo_int)
 
              save_data(clientes, prestamos, pagos, parametros)
-            st.success("Valor real actualizado ✅")
+             st.success("Valor real actualizado ✅")
             
             st.divider()   # 👈 AGREGAR ESTO
 
