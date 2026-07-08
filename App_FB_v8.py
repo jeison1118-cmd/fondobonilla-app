@@ -1689,8 +1689,50 @@ elif sel == TABS[7]:
         st.dataframe(aportes_tarifas)
 
         st.write("Filas:", len(aportes_tarifas))
+        
+        anio_actual = date.today().year
 
-        # ✅ ESTA VARIABLE ES LA CLAVE (EL ERROR VENÍA DE AQUÍ)
+        row_tar = aportes_tarifas[
+            aportes_tarifas["anio"] == anio_actual
+        ]
+
+        val_tarifa = 70000 if row_tar.empty else int(
+            row_tar.iloc[0]["valor_por_cupo"]
+        )
+
+        nueva_tarifa = st.number_input(
+            f"Tarifa por cupo ({anio_actual})",
+            min_value=0,
+            value=val_tarifa,
+            step=5000,
+            key="ap_tarifa_anio"
+        )
+
+        if st.button("Guardar tarifa", key="ap_tarifa_save"):
+
+            if row_tar.empty:
+                aportes_tarifas = pd.concat([
+                    aportes_tarifas,
+                    pd.DataFrame([{
+                        "anio": anio_actual,
+                        "valor_por_cupo": int(nueva_tarifa)
+                    }])
+                ], ignore_index=True)
+
+            else:
+                aportes_tarifas.loc[
+                    aportes_tarifas["anio"] == anio_actual,
+                    "valor_por_cupo"
+                ] = int(nueva_tarifa)
+
+            save_aportes_data(
+                integrantes,
+                aportes_tarifas,
+                aportes_pagos
+            )
+
+            st.success("Tarifa guardada.")
+        
         nuevos_aportes = []
 
         for i, row in integrantes.iterrows():
