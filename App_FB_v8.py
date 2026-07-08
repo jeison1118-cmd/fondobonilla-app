@@ -1685,6 +1685,11 @@ elif sel == TABS[7]:
 
         st.info(f"Valor por cupo vigente: {format_cop(nueva_tarifa)}")
 
+        st.write("Contenido de aportes_tarifas:")
+        st.dataframe(aportes_tarifas)
+
+        st.write("Filas:", len(aportes_tarifas))
+
         # ✅ ESTA VARIABLE ES LA CLAVE (EL ERROR VENÍA DE AQUÍ)
         nuevos_aportes = []
 
