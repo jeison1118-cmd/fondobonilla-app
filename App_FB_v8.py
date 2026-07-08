@@ -1245,10 +1245,33 @@ elif sel == TABS[3]:
 
     st.markdown("### Pagos")
     pagos_show = pagos.copy()
+
+    pagos_show["cliente"] = pagos_show["prestamo_id"].apply(
+        lambda pid: nombre_cliente_por_id(
+            clientes,
+            prestamos.loc[
+                prestamos["prestamo_id"] == pid,
+                "cliente_id"
+            ].iloc[0]
+        )
+        if not prestamos[prestamos["prestamo_id"] == pid].empty
+        else ""
+    )
     for c in ["monto_pago","interes_aplicado","capital_aplicado","mora_aplicada"]:
         if c in pagos_show.columns:
             pagos_show[c] = pagos_show[c].apply(format_cop)
     pagos_show = normalize_datetime_cols(pagos_show, ["fecha_pago","creado_en"], to_string=True)
+    cols = list(pagos_show.columns)
+
+    if "cliente" in cols:
+        cols.remove("cliente")
+
+    if "pago_id" in cols:
+        cols.remove("pago_id")
+
+    pagos_show = pagos_show[
+        ["cliente"] + cols
+    ]
     st.dataframe(pagos_show, use_container_width=True)
 
     def total_fondo_fin_mes(prestamos_df, pagos_df, parametros_df, aportes_pagos_df, fecha_corte):
