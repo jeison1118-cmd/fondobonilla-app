@@ -1673,6 +1673,17 @@ elif sel == TABS[7]:
             value=date.today(),
             key="ap_fecha_cobro"
         )
+        nueva_tarifa = 0
+
+        if not aportes_tarifas.empty:
+            try:
+                nueva_tarifa = float(
+                    aportes_tarifas.iloc[-1]["valor_por_cupo"]
+                )
+            except:
+                nueva_tarifa = 0
+
+        st.info(f"Valor por cupo vigente: {format_cop(nueva_tarifa)}")
 
         # ✅ ESTA VARIABLE ES LA CLAVE (EL ERROR VENÍA DE AQUÍ)
         nuevos_aportes = []
@@ -1710,17 +1721,6 @@ elif sel == TABS[7]:
                 st.success(f"Aportes registrados: {len(nuevos_aportes)}")
             else:
                 st.info("No se seleccionaron aportes.")
-        
-                if st.button("💾 Registrar aportes del período", key="ap_guardar_periodo"):
-                    if nuevos_aportes:
-                        aportes_pagos = pd.concat(
-                            [aportes_pagos, pd.DataFrame(nuevos_aportes)],
-                            ignore_index=True
-                        )
-                        save_aportes_data(integrantes, aportes_tarifas, aportes_pagos)
-                        st.success(f"Aportes registrados: {len(nuevos_aportes)}")
-                    else:
-                        st.info("No se seleccionaron aportes.")
 
         # ✅ ✅ ✅ AQUÍ ADENTRO VA EL RETIRO
         # ================================
