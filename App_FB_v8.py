@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 # Fondo Bonilla (v8 + auth, SIN SIDEBAR) — Login en cuerpo y Logout en topbar
 # Requisitos: pip install streamlit pandas openpyxl python-dateutil gspread gspread_dataFrame google-auth bcrypt
