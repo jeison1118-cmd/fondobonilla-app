@@ -1749,7 +1749,7 @@ elif sel == TABS[7]:
             save_aportes_data(
                 integrantes,
                 aportes_tarifas,
-                aportes_pagos
+                aportes_pagos,
                 gastos_fondo
             )
 
