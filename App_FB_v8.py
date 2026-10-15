@@ -2069,5 +2069,85 @@ elif sel == TABS[9]:
             st.dataframe(movs_show, use_container_width=True)
 
 
+elif sel == TABS[10]:
+    st.subheader("💸 Gastos del Fondo")
+
+    if not can_edit():
+        st.info(READ_ONLY_MSG)
+
+    else:
+
+        fecha_gasto = st.date_input(
+            "Fecha",
+            value=date.today(),
+            key="gf_fecha"
+        )
+
+        concepto = st.text_input(
+            "Concepto",
+            key="gf_concepto"
+        )
+
+        monto = st.number_input(
+            "Monto",
+            min_value=0,
+            step=1000,
+            key="gf_monto"
+        )
+
+        observaciones = st.text_area(
+            "Observaciones",
+            key="gf_obs"
+        )
+
+        if st.button("💾 Registrar gasto", key="gf_guardar"):
+
+            if not concepto.strip():
+                st.warning("Debes indicar un concepto.")
+
+            elif monto <= 0:
+                st.warning("Debes indicar un monto.")
+
+            else:
+
+                nuevo = {
+                    "gasto_id": str(uuid.uuid4()),
+                    "fecha": fecha_gasto,
+                    "concepto": concepto.strip(),
+                    "monto": float(monto),
+                    "observaciones": observaciones.strip(),
+                    "creado_en": datetime.now()
+                }
+
+                gastos_fondo = pd.concat(
+                    [gastos_fondo, pd.DataFrame([nuevo])],
+                    ignore_index=True
+                )
+
+                save_aportes_data(
+                    integrantes,
+                    aportes_tarifas,
+                    aportes_pagos,
+                    gastos_fondo
+                )
+
+                st.success("✅ Gasto registrado correctamente.")
+
+        st.divider()
+
+        st.subheader("Histórico de gastos")
+
+        if gastos_fondo.empty:
+            st.info("No hay gastos registrados.")
+        else:
+            st.dataframe(
+                gastos_fondo.sort_values(
+                    "fecha",
+                    ascending=False
+                ),
+                use_container_width=True
+            )
+
+
                     
 ####Nuevo
