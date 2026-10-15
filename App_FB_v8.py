@@ -262,6 +262,7 @@ def read_all():
         "integrantes": read_df("integrantes"),
         "aportes_tarifas": read_df("aportes_tarifas"),
         "aportes_pagos": read_df("aportes_pagos"),
+        "gastos_fondo": read_df("gastos_fondo"),
         "inversionista": read_df("inversionista"),
         "inversionista_movs": read_df("inversionista_movs"),
     }
@@ -445,6 +446,7 @@ def load_data():
     integrantes = safe_read("integrantes")
     aportes_tarifas = safe_read("aportes_tarifas")
     aportes_pagos = safe_read("aportes_pagos")
+    gastos_fondo = safe_read("gastos_fondo")
 
     clientes = ensure_cols(clientes, ["cliente_id","nombre","identificacion","telefono","email","creado_en","actualizado_en"])
     prestamos = ensure_cols(prestamos, ["prestamo_id","display_id","cliente_id","monto","tasa_mensual","fecha_inicio","plan_inicio","plazo_meses","frecuencia","saldo_capital","estado","ultimo_calculo","cuota_fija","creado_en","actualizado_en"])
@@ -453,7 +455,8 @@ def load_data():
     integrantes = ensure_cols(integrantes, ["integrante_id","nombre","identificacion","cupos","creado_en","actualizado_en"])
     aportes_tarifas = ensure_cols(aportes_tarifas, ["anio","valor_por_cupo"])
     aportes_pagos = ensure_cols(aportes_pagos, ["aporte_id","integrante_id","periodo","fecha_pago","cupos_pagados","monto_pagado","observaciones","creado_en"])
-
+    gastos_fondo = ensure_cols(gastos_fondo, ["gasto_id","fecha","concepto","monto","observaciones","creado_en"])
+    
     if "plan_inicio" not in prestamos.columns:
         prestamos["plan_inicio"] = prestamos.get("fecha_inicio", pd.Series(dtype=object))
     prestamos["plan_inicio"] = prestamos.apply(lambda r: r["plan_inicio"] if not pd.isna(r["plan_inicio"]) else r.get("fecha_inicio"), axis=1)
@@ -478,9 +481,9 @@ def load_data():
 
     if changed:
         save_data(clientes, prestamos, pagos, parametros)
-        save_aportes_data(integrantes, aportes_tarifas, aportes_pagos)
+        save_aportes_data(integrantes, aportes_tarifas, aportes_pagos, gastos_fondo)
 
-    return clientes, prestamos, pagos, parametros, integrantes, aportes_tarifas, aportes_pagos
+    return clientes, prestamos, pagos, parametros, integrantes, aportes_tarifas, aportes_pagos, gastos_fondo
 
 # -------------------- Inversionista --------------------
 def _safe_read_sheet(sheet):
@@ -523,10 +526,11 @@ def save_data(clientes, prestamos, pagos, parametros, path=EXCEL_PATH):
     _write_and_update_cache("pagos", pagos)
     _write_and_update_cache("parametros", parametros)
 
-def save_aportes_data(integrantes, aportes_tarifas, aportes_pagos):
+def save_aportes_data(integrantes, aportes_tarifas, aportes_pagos, gastos_fondo):
     _write_and_update_cache("integrantes", integrantes)
     _write_and_update_cache("aportes_tarifas", aportes_tarifas)
     _write_and_update_cache("aportes_pagos", aportes_pagos)
+    _write_and_update_cache("gastos_fondo", gastos_fondo)
 
 # -------------------- Lógica --------------------
 def calcular_cuota_fija(P, i_mensual, n):
@@ -1002,8 +1006,8 @@ def build_sim_image(sim: dict, tabla_df: pd.DataFrame, logo_path: str = "assets/
 
 # -------------------- Layout (sin sidebar) --------------------
 data = get_data()
-(clientes, prestamos, pagos, parametros, integrantes, aportes_tarifas, aportes_pagos) = (
-    data["clientes"], data["prestamos"], data["pagos"], data["parametros"], data["integrantes"], data["aportes_tarifas"], data["aportes_pagos"]
+(clientes, prestamos, pagos, parametros, integrantes, aportes_tarifas, aportes_pagos, gastos_fondo) = (
+    data["clientes"], data["prestamos"], data["pagos"], data["parametros"], data["integrantes"], data["aportes_tarifas"], data["aportes_pagos"], data["gastos_fondo"]
 )
 
 TABS = ["📊 Panel", "➕ Nuevo Préstamo", "💳 Registrar Pago", "📑 Reportes", "🧮 Simulador", "🗃️ Datos / Parámetros / Correciones", "♻️ Re‑amortización", "👥 Aportes", "💸 Gastos Fondo", "👥 Integrantes", "👤 Inversionista"]
@@ -1746,6 +1750,7 @@ elif sel == TABS[7]:
                 integrantes,
                 aportes_tarifas,
                 aportes_pagos
+                gastos_fondo
             )
 
             st.success("Tarifa guardada.")
@@ -1781,7 +1786,7 @@ elif sel == TABS[7]:
                     [aportes_pagos, pd.DataFrame(nuevos_aportes)],
                     ignore_index=True
                 )
-                save_aportes_data(integrantes, aportes_tarifas, aportes_pagos)
+                save_aportes_data(integrantes, aportes_tarifas, aportes_pagos, gastos_fondo)
                 st.success(f"Aportes registrados: {len(nuevos_aportes)}")
             else:
                 st.info("No se seleccionaron aportes.")
@@ -1848,7 +1853,7 @@ elif sel == TABS[7]:
                         ignore_index=True
                     )
 
-                    save_aportes_data(integrantes, aportes_tarifas, aportes_pagos)
+                    save_aportes_data(integrantes, aportes_tarifas, aportes_pagos, gastos_fondo)
 
                     st.success(f"✅ Retiro realizado: {format_cop(retiro)}")
 
@@ -1891,7 +1896,7 @@ elif sel == TABS[8]:
                     mask_new = integrantes["integrante_id"] == iid
                     integrantes.loc[mask_new, ["cupos", "actualizado_en"]] = [int(n_cupos or 0), datetime.now()]
                     aportes_pagos = aportes_tmp
-                    save_aportes_data(integrantes, aportes_tarifas, aportes_pagos)
+                    save_aportes_data(integrantes, aportes_tarifas, aportes_pagos, gastos_fondo)
                     st.success(f"Integrante creado. Igualación registrada por {format_cop(monto)}.")
                 except Exception as e:
                     st.error(f"Error: {e}")
@@ -1926,7 +1931,7 @@ elif sel == TABS[8]:
                         mask = integrantes["integrante_id"] == iid_sel
                         integrantes.loc[mask, ["cupos","actualizado_en"]] = [nuevo_total, datetime.now()]
                         aportes_pagos = aportes_tmp
-                        save_aportes_data(integrantes, aportes_tarifas, aportes_pagos)
+                        save_aportes_data(integrantes, aportes_tarifas, aportes_pagos, gastos_fondo)
                         st.success(f"Cupos actualizados a {nuevo_total}. Igualación: {format_cop(monto)}.")
                     except Exception as e:
                         st.error(f"Error: {e}")
@@ -1962,7 +1967,7 @@ elif sel == TABS[8]:
                         mask = integrantes["integrante_id"] == iid_sel
                         integrantes.loc[mask, ["cupos","actualizado_en"]] = [nuevo_total, datetime.now()]
                         aportes_pagos = aportes_tmp
-                        save_aportes_data(integrantes, aportes_tarifas, aportes_pagos)
+                        save_aportes_data(integrantes, aportes_tarifas, aportes_pagos, gastos_fondo)
                         st.success(f"Cupos actualizados a {nuevo_total}. Devolución: {format_cop(monto)}.")
                     except Exception as e:
                         st.error(f"Error: {e}")
@@ -1992,7 +1997,7 @@ elif sel == TABS[8]:
                             monto = 0
                         mask = integrantes["integrante_id"] == iid_sel
                         integrantes.loc[mask, ["cupos","actualizado_en"]] = [0, datetime.now()]
-                        save_aportes_data(integrantes, aportes_tarifas, aportes_pagos)
+                        save_aportes_data(integrantes, aportes_tarifas, aportes_pagos, gastos_fondo)
                         st.success(f"Integrante retirado. Cupos=0. Devolución: {format_cop(monto)}.")
                         st.info("No se elimina la fila para preservar el histórico.")
                     except Exception as e:
