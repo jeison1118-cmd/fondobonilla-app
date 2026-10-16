@@ -798,7 +798,7 @@ def crear_integrante(integrantes_df: pd.DataFrame, nombre: str, identificacion: 
     return integrantes_df, iid
 
 
-def _valor_por_cupo_actual(prestamos_df, pagos_df, parametros_df, integrantes_df, aportes_pagos_df, inv_df=None, inv_movs_df=None) -> float:
+def _valor_por_cupo_actual(prestamos_df, pagos_df, parametros_df, integrantes_df, aportes_pagos_df, gastos_fondo=None, inv_df=None, inv_movs_df=None) -> float:
     """Calcula total_por_cupo (sin inversionista) con la misma lógica del Panel."""
     capital_inicial = 0.0
     row = parametros_df[parametros_df.get("clave") == "capital_inicial"] if not parametros_df.empty else pd.DataFrame()
@@ -813,6 +813,16 @@ def _valor_por_cupo_actual(prestamos_df, pagos_df, parametros_df, integrantes_df
     capital_recuperado = float(pagos_df.get("capital_aplicado", pd.Series(dtype=float)).sum()) if not pagos_df.empty else 0.0
     aportes_cobrados = float(aportes_pagos_df.get("monto_pagado", pd.Series(dtype=float)).sum()) if (aportes_pagos_df is not None and not aportes_pagos_df.empty) else 0.0
 
+    gastos_total = 0.0
+
+    if gastos_fondo is not None and not gastos_fondo.empty:
+        try:
+            gastos_total = float(
+                gastos_fondo["monto"].sum()
+            )
+        except:
+            gastos_total = 0.0
+            
     if inv_df is None or inv_movs_df is None:
         try:
             inv_df, inv_movs_df = load_inversionista()
@@ -828,7 +838,7 @@ def _valor_por_cupo_actual(prestamos_df, pagos_df, parametros_df, integrantes_df
         except Exception:
             pagos_a_inversionista = 0.0
 
-    caja_actual = capital_inicial - total_desembolsado + (intereses_cobrados + capital_recuperado + aportes_cobrados) - pagos_a_inversionista
+    caja_actual = capital_inicial - total_desembolsado + (intereses_cobrados + capital_recuperado + aportes_cobrados) - pagos_a_inversionista - gastos_total
     saldo_capital_total = float(prestamos_df.get("saldo_capital", pd.Series(dtype=float)).sum()) if not prestamos_df.empty else 0.0
     total_fondo = caja_actual + saldo_capital_total
 
@@ -858,7 +868,7 @@ def registrar_ajuste_por_cupos(prestamos_df, pagos_df, parametros_df, integrante
     if dc == 0:
         return aportes_pagos_df, 0
 
-    v_cupo = _valor_por_cupo_actual(prestamos_df, pagos_df, parametros_df, integrantes_df, aportes_pagos_df, inv_df, inv_movs_df)
+    v_cupo = _valor_por_cupo_actual(prestamos_df, pagos_df, parametros_df, integrantes_df, aportes_pagos_df, gastos_fondo_df, inv_df, inv_movs_df)
     if v_cupo < 0:
         raise ValueError("El total por cupo actual es negativo; revisa los datos del fondo antes de continuar.")
 
@@ -1019,7 +1029,7 @@ sel = st.radio("Navegación", options=TABS, key="nav_tabs")
 if sel == TABS[0]:
     st.subheader("Panel general")
 
-    def resumen_fondo_ext(prestamos_df, pagos_df, parametros_df, integ_df=None, aportes_pagos_df=None, inv_df=None, inv_movs_df=None):
+    def resumen_fondo_ext(prestamos_df, pagos_df, parametros_df, integ_df=None, aportes_pagos_df=None, gastos_fondo=None, inv_df=None, inv_movs_df=None):
         capital_inicial = 0.0
         row = parametros_df[parametros_df["clave"] == "capital_inicial"]
         if not row.empty:
@@ -1033,6 +1043,16 @@ if sel == TABS[0]:
         intereses_cobrados = float(pagos_df.get("interes_aplicado", pd.Series(dtype=float)).sum()) if not pagos_df.empty else 0.0
         capital_recuperado = float(pagos_df.get("capital_aplicado", pd.Series(dtype=float)).sum()) if not pagos_df.empty else 0.0
         aportes_cobrados = float(aportes_pagos_df["monto_pagado"].sum()) if (aportes_pagos_df is not None and not aportes_pagos_df.empty) else 0.0
+
+        gastos_total = 0.0
+
+        if gastos_fondo is not None and not gastos_fondo.empty:
+            try:
+                gastos_total = float(
+                    gastos_fondo["monto"].sum()
+                )
+            except:
+                gastos_total = 0.0
 
         # Egresos inversionista (dividendos + cancelación)
         pagos_a_inversionista = 0.0
@@ -1048,7 +1068,17 @@ if sel == TABS[0]:
             pagos_a_inversionista = float(montos_egreso.sum())
 
         # Caja neta (restando egresos)
-        caja_actual = capital_inicial - total_desembolsado + (intereses_cobrados + capital_recuperado + aportes_cobrados) - pagos_a_inversionista
+        gastos_total = 0.0
+
+        if gastos_fondo is not None and not gastos_fondo.empty:
+            try:
+                gastos_total = float(
+                    gastos_fondo["monto"].sum()
+                )
+            except:
+                gastos_total = 0.0
+
+        caja_actual = capital_inicial - total_desembolsado + (intereses_cobrados + capital_recuperado + aportes_cobrados) - pagos_a_inversionista - gastos_total
         total_prestado = saldo_capital_total
         total_fondo = caja_actual + total_prestado
 
@@ -1079,7 +1109,7 @@ if sel == TABS[0]:
         return {"caja_actual": caja_actual, "total_prestado": total_prestado, "intereses_anio": intereses_anio, "total_fondo": total_fondo, "total_sin_inversion": total_sin_inversion, "pasivo_inversionista": pasivo_inv, "total_por_cupo": total_por_cupo, "total_cupos": total_cupos}
 
     inv_df, inv_movs_df = load_inversionista()
-    R = resumen_fondo_ext(prestamos, pagos, parametros, integrantes, aportes_pagos, inv_df, inv_movs_df)
+    R = resumen_fondo_ext(prestamos, pagos, parametros, integrantes, aportes_pagos, gastos_fondo, inv_df, inv_movs_df)
 
     c1, c2, c3 = st.columns(3, gap="large")
     c1.metric("Caja actual", format_cop(R["caja_actual"]))
@@ -1876,7 +1906,7 @@ elif sel == TABS[8]:
             n_ident  = cB.text_input("Identificación", key="invz_new_ident")
             n_cupos  = cC.number_input("Cupos iniciales", min_value=0, value=0, step=1, key="invz_new_cupos")
             try:
-                v_preview = _valor_por_cupo_actual(prestamos, pagos, parametros, integrantes, aportes_pagos, inv_df_tab, inv_movs_df_tab)
+                v_preview = _valor_por_cupo_actual(prestamos, pagos, parametros, integrantes, aportes_pagos, gastos_fondo, inv_df_tab, inv_movs_df_tab)
                 st.caption(f"Total por cupo (sin inversionista) actual: {format_cop(v_preview)} · "
                            f"Igualación estimada: {format_cop(int(round(v_preview * int(n_cupos or 0))))}")
             except Exception as e:
@@ -1915,7 +1945,7 @@ elif sel == TABS[8]:
                 iid_sel, cupos_act = mapa.get(sel, ("", 0))
                 add_k = st.number_input("Cupos a agregar", min_value=0, value=0, step=1, key="invz_add_k")
                 try:
-                    v_preview = _valor_por_cupo_actual(prestamos, pagos, parametros, integrantes, aportes_pagos, inv_df_tab, inv_movs_df_tab)
+                    v_preview = _valor_por_cupo_actual(prestamos, pagos, parametros, integrantes, aportes_pagos, gastos_fondo, inv_df_tab, inv_movs_df_tab)
                     st.caption(f"Total por cupo actual: {format_cop(v_preview)} · "
                                f"Igualación estimada: {format_cop(int(round(v_preview * int(add_k or 0))))}")
                 except Exception as e:
@@ -1951,7 +1981,7 @@ elif sel == TABS[8]:
                 max_k = int(cupos_act or 0)
                 rem_k = st.number_input("Cupos a retirar", min_value=0, max_value=max_k, value=0, step=1, key="invz_rem_k")
                 try:
-                    v_preview = _valor_por_cupo_actual(prestamos, pagos, parametros, integrantes, aportes_pagos, inv_df_tab, inv_movs_df_tab)
+                    v_preview = _valor_por_cupo_actual(prestamos, pagos, parametros, integrantes, aportes_pagos, gastos_fondo, inv_df_tab, inv_movs_df_tab)
                     st.caption(f"Total por cupo actual: {format_cop(v_preview)} · "
                                f"Devolución estimada: {format_cop(int(round(v_preview * int(rem_k or 0))) * -1)}")
                 except Exception as e:
